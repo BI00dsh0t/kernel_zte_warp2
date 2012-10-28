@@ -13,11 +13,8 @@ obj-$(CONFIG_BLK_DEV_THROTTLING)	+= blk-throttle.o
 obj-$(CONFIG_IOSCHED_NOOP)	+= noop-iosched.o
 obj-$(CONFIG_IOSCHED_DEADLINE)	+= deadline-iosched.o
 obj-$(CONFIG_IOSCHED_CFQ)	+= cfq-iosched.o
-<<<<<<< HEAD
 obj-$(CONFIG_IOSCHED_SIO)	+= sio-iosched.o
 obj-$(CONFIG_IOSCHED_VR)	+= vr-iosched.o
-=======
->>>>>>> 57510cd04b2778c7931d4ed38990d5eac337cfe8
 
 obj-$(CONFIG_BLOCK_COMPAT)	+= compat_ioctl.o
 obj-$(CONFIG_BLK_DEV_INTEGRITY)	+= blk-integrity.o
