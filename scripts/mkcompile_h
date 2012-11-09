@@ -28,16 +28,10 @@ export LC_ALL
 
 if [ -z "$KBUILD_BUILD_VERSION" ]; then
 	if [ -r .version ]; then
-<<<<<<< HEAD
-		VERSION=v0.1.0
-	else
-		VERSION=v0.1.0
-=======
 		VERSION=`cat .version`
 	else
 		VERSION=0
 		echo 0 > .version
->>>>>>> 57510cd04b2778c7931d4ed38990d5eac337cfe8
 	fi
 else
 	VERSION=$KBUILD_BUILD_VERSION
@@ -79,13 +73,8 @@ UTS_TRUNCATE="cut -b -$UTS_LEN"
 
   echo \#define UTS_VERSION \"`echo $UTS_VERSION | $UTS_TRUNCATE`\"
 
-<<<<<<< HEAD
-  echo \#define LINUX_COMPILE_BY \"AGAT_ZTE_kernel\"
-  echo \#define LINUX_COMPILE_HOST \" \"
-=======
   echo \#define LINUX_COMPILE_BY \"`echo $LINUX_COMPILE_BY | $UTS_TRUNCATE`\"
   echo \#define LINUX_COMPILE_HOST \"`echo $LINUX_COMPILE_HOST | $UTS_TRUNCATE`\"
->>>>>>> 57510cd04b2778c7931d4ed38990d5eac337cfe8
 
   echo \#define LINUX_COMPILER \"`$CC -v 2>&1 | tail -n 1`\"
 ) > .tmpcompile

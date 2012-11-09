@@ -35,15 +35,12 @@
  * It helps to keep variable names smaller, simpler
  */
 
-#define DEF_FREQUENCY_UP_THRESHOLD				(60)
-#define DEF_FREQUENCY_DOWN_THRESHOLD				(30)
-#define FREQ_STEP_DOWN 						(200000)
-static unsigned int step_down;
-#define FREQ_SLEEP_MAX 						(500000)
-static unsigned int sleep_max;
-#define FREQ_AWAKE_MIN 						(100000)
-static unsigned int awake_min;
-#define FREQ_STEP_UP_SLEEP_PERCENT				(15)
+#define DEF_FREQUENCY_UP_THRESHOLD			CONFIG_LAGFREE_MAX_LOAD
+#define DEF_FREQUENCY_DOWN_THRESHOLD			CONFIG_LAGFREE_MIN_LOAD
+#define FREQ_STEP_DOWN 					CONFIG_LAGFREE_FREQ_STEP_DOWN
+#define FREQ_SLEEP_MAX 					CONFIG_LAGFREE_FREQ_SLEEP_MAX
+#define FREQ_AWAKE_MIN 					CONFIG_LAGFREE_FREQ_AWAKE_MIN
+#define FREQ_STEP_UP_SLEEP_PERCENT 			CONFIG_LAGFREE_FREQ_STEP_UP_SLEEP_PERCENT
 
 /*
  * The polling frequency of this governor depends on the capability of
@@ -55,13 +52,16 @@ static unsigned int awake_min;
  * with CPUFREQ_ETERNAL), this governor will not work.
  * All times here are in uS.
  */
-#define MIN_SAMPLING_RATE_RATIO			(1)
-
-static unsigned int min_sampling_rate;
+static unsigned int def_sampling_rate;
 unsigned int suspended = 0;
-#define LATENCY_MULTIPLIER			(500)
-#define MIN_LATENCY_MULTIPLIER			(100)
-#define DEF_SAMPLING_DOWN_FACTOR		(2)
+#define MIN_SAMPLING_RATE_RATIO			(2)
+/* for correct statistics, we need at least 10 ticks between each measure */
+#define MIN_STAT_SAMPLING_RATE			\
+	(MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(CONFIG_CPU_FREQ_MIN_TICKS))
+#define MIN_SAMPLING_RATE			\
+			(def_sampling_rate / MIN_SAMPLING_RATE_RATIO)
+#define MAX_SAMPLING_RATE			(500 * def_sampling_rate)
+#define DEF_SAMPLING_DOWN_FACTOR		(4)
 #define MAX_SAMPLING_DOWN_FACTOR		(10)
 #define TRANSITION_LATENCY_LIMIT		(10 * 1000 * 1000)
 
@@ -145,12 +145,12 @@ static struct notifier_block dbs_cpufreq_notifier_block = {
 /************************** sysfs interface ************************/
 static ssize_t show_sampling_rate_max(struct cpufreq_policy *policy, char *buf)
 {
-	return sprintf (buf, "%u\n", min_sampling_rate*100);
+	return sprintf (buf, "%u\n", MAX_SAMPLING_RATE);
 }
 
 static ssize_t show_sampling_rate_min(struct cpufreq_policy *policy, char *buf)
 {
-	return sprintf (buf, "%u\n", min_sampling_rate);
+	return sprintf (buf, "%u\n", MIN_SAMPLING_RATE);
 }
 
 #define define_one_ro(_name)				\
@@ -180,7 +180,7 @@ static ssize_t store_sampling_down_factor(struct cpufreq_policy *unused,
 	unsigned int input;
 	int ret;
 	ret = sscanf (buf, "%u", &input);
-	if (ret != 1 || input > 25 || input < 1)
+	if (ret != 1 || input > MAX_SAMPLING_DOWN_FACTOR || input < 1)
 		return -EINVAL;
 
 	mutex_lock(&dbs_mutex);
@@ -198,7 +198,7 @@ static ssize_t store_sampling_rate(struct cpufreq_policy *unused,
 	ret = sscanf (buf, "%u", &input);
 
 	mutex_lock(&dbs_mutex);
-	if (ret != 1 || input > min_sampling_rate*100 || input < min_sampling_rate) {
+	if (ret != 1 || input > MAX_SAMPLING_RATE || input < MIN_SAMPLING_RATE) {
 		mutex_unlock(&dbs_mutex);
 		return -EINVAL;
 	}
@@ -403,12 +403,12 @@ static void dbs_check_cpu(int cpu)
 			this_dbs_info->requested_freq = policy->max;
 		
 		//Screen off mode
-		if (suspended && this_dbs_info->requested_freq > sleep_max)
-			this_dbs_info->requested_freq = sleep_max;
+		if (suspended && this_dbs_info->requested_freq > FREQ_SLEEP_MAX)
+		    this_dbs_info->requested_freq = FREQ_SLEEP_MAX;
 		    
 		//Screen off mode
-		if (!suspended && this_dbs_info->requested_freq < awake_min)
-			this_dbs_info->requested_freq = awake_min;
+		if (!suspended && this_dbs_info->requested_freq < FREQ_AWAKE_MIN)
+		    this_dbs_info->requested_freq = FREQ_AWAKE_MIN;
 
 		__cpufreq_driver_target(policy, this_dbs_info->requested_freq,
 			CPUFREQ_RELATION_H);
@@ -449,7 +449,7 @@ static void dbs_check_cpu(int cpu)
 			return;
 
 		//freq_target = (dbs_tuners_ins.freq_step * policy->max) / 100;
-		freq_target = step_down; //policy->max;
+		freq_target = FREQ_STEP_DOWN; //policy->max;
 
 		/* max freq cannot be less than 100. But who knows.... */
 		if (unlikely(freq_target == 0))
@@ -465,12 +465,12 @@ static void dbs_check_cpu(int cpu)
 			this_dbs_info->requested_freq = policy->min;
 			
 		//Screen on mode
-		if (!suspended && this_dbs_info->requested_freq < awake_min)
-			this_dbs_info->requested_freq = awake_min;
+		if (!suspended && this_dbs_info->requested_freq < FREQ_AWAKE_MIN)
+		    this_dbs_info->requested_freq = FREQ_AWAKE_MIN;
 		
 		//Screen off mode
-		if (suspended && this_dbs_info->requested_freq > sleep_max)
-			this_dbs_info->requested_freq = sleep_max;
+		if (suspended && this_dbs_info->requested_freq > FREQ_SLEEP_MAX)
+		    this_dbs_info->requested_freq = FREQ_SLEEP_MAX;
 
 		__cpufreq_driver_target(policy, this_dbs_info->requested_freq,
 				CPUFREQ_RELATION_H);
@@ -503,20 +503,6 @@ static inline void dbs_timer_exit(void)
 	return;
 }
 
-static void lagfree_early_suspend(struct early_suspend *handler) {
-	suspended = 1;
-}
-
-static void lagfree_late_resume(struct early_suspend *handler) {
-	suspended = 0;
-}
-
-static struct early_suspend lagfree_power_suspend = {
-	.suspend = lagfree_early_suspend,
-	.resume = lagfree_late_resume,
-	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1,
-};
-
 static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 				   unsigned int event)
 {
@@ -524,10 +510,6 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 	struct cpu_dbs_info_s *this_dbs_info;
 	unsigned int j;
 	int rc;
-	unsigned int min_freq = ~0;
-	unsigned int max_freq = 0;
-	unsigned int i;
-	struct cpufreq_frequency_table *freq_table;
 
 	this_dbs_info = &per_cpu(cpu_dbs_info, cpu);
 
@@ -572,18 +554,13 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 			if (latency == 0)
 				latency = 1;
 
-			/*
-			 * conservative does not implement micro like ondemand
-			 * governor, thus we are bound to jiffes/HZ
-			 */
-			min_sampling_rate =
-				MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(1);
-			/* Bring kernel and HW constraints together */
-			min_sampling_rate = max(min_sampling_rate,
-					MIN_LATENCY_MULTIPLIER * latency);
-			dbs_tuners_ins.sampling_rate =
-				max(min_sampling_rate,
-				    latency * LATENCY_MULTIPLIER);
+			def_sampling_rate = 10 * latency *
+				CONFIG_CPU_FREQ_SAMPLING_LATENCY_MULTIPLIER;
+
+			if (def_sampling_rate < MIN_STAT_SAMPLING_RATE)
+				def_sampling_rate = MIN_STAT_SAMPLING_RATE;
+
+			dbs_tuners_ins.sampling_rate = def_sampling_rate;
 
 			dbs_timer_init();
 			cpufreq_register_notifier(
@@ -592,21 +569,6 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		}
 
 		mutex_unlock(&dbs_mutex);
-		freq_table = cpufreq_frequency_get_table(policy->cpu);
-		for (i = 0; (freq_table[i].frequency != CPUFREQ_TABLE_END); i++) {
-			unsigned int freq = freq_table[i].frequency;
-			if (freq == CPUFREQ_ENTRY_INVALID) {
-				continue;
-			}
-			if (freq < min_freq)
-				min_freq = freq;
-			if (freq > max_freq)
-				max_freq = freq;
-		}
-		step_down = min_freq;
-		sleep_max = min_freq;                //Minimum CPU frequency in table
-		awake_min = min_freq;                //Minimum CPU frequency in table
-		register_early_suspend(&lagfree_power_suspend);
 		break;
 
 	case CPUFREQ_GOV_STOP:
@@ -626,7 +588,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		}
 
 		mutex_unlock(&dbs_mutex);
-		unregister_early_suspend(&lagfree_power_suspend);
+
 		break;
 
 	case CPUFREQ_GOV_LIMITS:
@@ -655,8 +617,23 @@ struct cpufreq_governor cpufreq_gov_lagfree = {
 	.owner			= THIS_MODULE,
 };
 
+static void lagfree_early_suspend(struct early_suspend *handler) {
+	suspended = 1;
+}
+
+static void lagfree_late_resume(struct early_suspend *handler) {
+	suspended = 0;
+}
+
+static struct early_suspend lagfree_power_suspend = {
+	.suspend = lagfree_early_suspend,
+	.resume = lagfree_late_resume,
+	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1,
+};
+
 static int __init cpufreq_gov_dbs_init(void)
 {
+	register_early_suspend(&lagfree_power_suspend);
 	return cpufreq_register_governor(&cpufreq_gov_lagfree);
 }
 
@@ -665,6 +642,7 @@ static void __exit cpufreq_gov_dbs_exit(void)
 	/* Make sure that the scheduled work is indeed not running */
 	flush_scheduled_work();
 
+	unregister_early_suspend(&lagfree_power_suspend);
 	cpufreq_unregister_governor(&cpufreq_gov_lagfree);
 }
 
@@ -681,5 +659,4 @@ fs_initcall(cpufreq_gov_dbs_init);
 #else
 module_init(cpufreq_gov_dbs_init);
 #endif
-module_exit(cpufreq_gov_dbs_exit);
-
+module_exit(cpufreq_gov_dbs_exit); 
