@@ -15,6 +15,7 @@
 
 enum {
 	GLOBAL_DOMAIN,
+    ROTATOR_DOMAIN,
 	MAX_DOMAINS
 };
 
