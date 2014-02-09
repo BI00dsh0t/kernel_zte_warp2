@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-msm/rpc_hsusb.c
  *
- * Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
  * All source code in this file is licensed under the following license except
  * where indicated.
@@ -20,6 +20,7 @@
 
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/module.h>
 #include <mach/rpc_hsusb.h>
 #include <asm/mach-types.h>
 
@@ -68,7 +69,7 @@ static int msm_hsusb_init_rpc_ids(unsigned long vers)
 		usb_rpc_ids.reset_rework_installed	= 17;
 		usb_rpc_ids.enable_pmic_ulpi_data0	= 18;
 		usb_rpc_ids.disable_pmic_ulpi_data0	= 19;
-		usb_rpc_ids.get_usb_conf_nv_value	= 99; 
+		usb_rpc_ids.get_usb_conf_nv_value	= 99;
 		return 0;
 	} else if (vers == 0x00010002) {
 		usb_rpc_ids.prog			= 0x30000064;
@@ -82,7 +83,7 @@ static int msm_hsusb_init_rpc_ids(unsigned long vers)
 		usb_rpc_ids.reset_rework_installed	= 17;
 		usb_rpc_ids.enable_pmic_ulpi_data0	= 18;
 		usb_rpc_ids.disable_pmic_ulpi_data0	= 19;
-		usb_rpc_ids.get_usb_conf_nv_value	= 99; 
+		usb_rpc_ids.get_usb_conf_nv_value	= 99;
 		return 0;
 	} else {
 		pr_err("%s: no matches found for version\n",
@@ -624,7 +625,7 @@ int usb_diag_update_pid_and_serial_num(uint32_t pid, const char *snum)
 }
 
 
-#ifdef CONFIG_USB_GADGET_MSM_72K
+#ifdef CONFIG_USB_MSM_72K
 /* charger api wrappers */
 int hsusb_chg_init(int connect)
 {

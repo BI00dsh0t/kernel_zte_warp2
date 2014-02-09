@@ -909,6 +909,11 @@ void broadcast_event(u32 evt_id, u32 dev_id, u32 session_id)
 		&& (evt_id != AUDDEV_EVT_STREAM_VOL_CHG)
 		&& (evt_id != AUDDEV_EVT_AUDIO_LP_START)
 		&& (evt_id != AUDDEV_EVT_AUDIO_LP_END)
+		//lll054850 add for hide menu fens&widevoice
+		&&(evt_id != AUDDEV_EVT_DEVICE_FENS_ENABLE)
+		&&(evt_id != AUDDEV_EVT_DEVICE_FENS_DISABLE)
+		&&(evt_id != AUDDEV_EVT_DEVICE_WIDEVOICE_ENABLE)
+		&&(evt_id != AUDDEV_EVT_DEVICE_WIDEVOICE_DISABLE)
 		&& (evt_id != AUDDEV_EVT_VOICE_STATE_CHG)) {
 		dev_info = audio_dev_ctrl_find_dev(dev_id);
 		if (IS_ERR(dev_info)) {
@@ -943,8 +948,13 @@ void broadcast_event(u32 evt_id, u32 dev_id, u32 session_id)
 				continue;
 			}
 		}
-		if ((evt_id == AUDDEV_EVT_AUDIO_LP_START) || 
-		    (evt_id == AUDDEV_EVT_AUDIO_LP_END)) {
+		if ((evt_id == AUDDEV_EVT_AUDIO_LP_START)
+			//lll054850 add for hide menu fens&widevoice
+			|| (evt_id == AUDDEV_EVT_DEVICE_FENS_ENABLE)
+			|| (evt_id == AUDDEV_EVT_DEVICE_FENS_DISABLE)
+			|| (evt_id == AUDDEV_EVT_DEVICE_WIDEVOICE_ENABLE)
+			|| (evt_id == AUDDEV_EVT_DEVICE_WIDEVOICE_DISABLE)
+		    || (evt_id == AUDDEV_EVT_AUDIO_LP_END)) {
 		  printk(KERN_ERR "[MyTag]broadcast_event: auddev_evt_listener()\n");
 		  callback->auddev_evt_listener(evt_id, NULL, NULL);
 		  if (callback->cb_next == NULL)

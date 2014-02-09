@@ -7,7 +7,7 @@
 #include <linux/wakelock.h>
 #include <linux/proc_fs.h>
 #include "power.h"
-#include "../../arch/arm/mach-msm/proc_comm.h"
+#include <mach/proc_comm.h>
 #include <linux/earlysuspend.h>
 
 int print_hb_wakelock(int type, char *buf, int len, unsigned long on_jiff, unsigned long timeout);
@@ -61,11 +61,6 @@ static DEFINE_TIMER(hb_wakelock_timer, hb_wakelock_handle, 0,(unsigned long)&hb_
 
 static void hiberate_enter_exit(bool enter_exit)
 {
-	/* unsigned subcmd=ZTE_PROC_COMM_CMD3_HIBERATE_EXIT; */
-	/* subcmd = enter_exit?ZTE_PROC_COMM_CMD3_HIBERATE_ENTER : ZTE_PROC_COMM_CMD3_HIBERATE_EXIT; */
-	/* printk(KERN_ERR"hibernate: proc_comm to notify arm9 hibernate %s\n", */
-	/*        enter_exit? "enter":"exit"); */
-	/* msm_proc_comm(PCOM_CUSTOMER_CMD3, 0, &subcmd); */
 	return ;
 }
 

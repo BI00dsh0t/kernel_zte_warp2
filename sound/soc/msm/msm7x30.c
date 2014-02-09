@@ -106,6 +106,37 @@ static int msm_v_call_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int msm_v_loopback_info(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int msm_v_loopback_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = 0;
+	return 0;
+}
+
+static int msm_v_loopback_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	int start = ucontrol->value.integer.value[0];
+	printk(KERN_ERR "[MyTag]msm_v_loopback_put(%d)\n", start);
+	if (start)
+		broadcast_event(AUDDEV_EVT_AUDIO_LP_START, DEVICE_IGNORE,
+							SESSION_IGNORE);
+	else
+		broadcast_event(AUDDEV_EVT_AUDIO_LP_END, DEVICE_IGNORE,
+							SESSION_IGNORE);
+	return 0;
+}
+
 static int msm_v_mute_info(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_info *uinfo)
 {
@@ -755,6 +786,79 @@ static int msm_device_mute_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+//lll054850 add for hide menu fens&widevoice
+static int msm_device_fens_info(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	pr_debug("%s: \n", __func__);
+	return 0;
+}
+
+static int msm_device_fens_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	return 0;
+}
+
+static int msm_device_fens_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	int enable = ucontrol->value.integer.value[0];
+	pr_debug("%s: enable=%d\n", __func__, enable);
+
+	if(enable)
+	{
+		broadcast_event(AUDDEV_EVT_DEVICE_FENS_ENABLE, DEVICE_IGNORE, SESSION_IGNORE);
+	}
+	else
+	{
+		broadcast_event(AUDDEV_EVT_DEVICE_FENS_DISABLE, DEVICE_IGNORE, SESSION_IGNORE);
+	}
+
+	return 0;
+}
+
+
+
+static int msm_device_widevoice_info(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	pr_debug("%s: \n", __func__);
+	return 0;
+}
+
+static int msm_device_widevoice_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	return 0;
+}
+
+static int msm_device_widevoice_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	int enable = ucontrol->value.integer.value[0];
+	pr_debug("%s: enable=%d\n", __func__, enable);
+
+	if(enable)
+	{
+		broadcast_event(AUDDEV_EVT_DEVICE_WIDEVOICE_ENABLE, DEVICE_IGNORE, SESSION_IGNORE);
+	}
+	else
+	{
+		broadcast_event(AUDDEV_EVT_DEVICE_WIDEVOICE_DISABLE, DEVICE_IGNORE, SESSION_IGNORE);
+	}
+
+	return 0;
+}
+//lll054850
 static int msm_loopback_info(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_info *uinfo)
 {
@@ -890,6 +994,17 @@ static struct snd_kcontrol_new snd_msm_controls[] = {
 			msm_device_mute_get, msm_device_mute_put, 0),
 	MSM_EXT("Sound Device Loopback",  msm_loopback_info,
 			msm_loopback_get, msm_loopback_put, 0),
+//lll054850 add for hide menu fens&widevoice
+    MSM_EXT("FENS",  msm_device_fens_info,
+			msm_device_fens_get, msm_device_fens_put, 0),
+    MSM_EXT("Widevoice",  msm_device_widevoice_info,
+			msm_device_widevoice_get, msm_device_widevoice_put, 0),
+    
+};
+
+static struct snd_kcontrol_new snd_lb_controls[] = {
+	MSM_EXT("Loopback Test",  msm_v_loopback_info, msm_v_loopback_get, \
+						msm_v_loopback_put, 0),
 };
 
 static int msm_new_mixer(struct snd_soc_codec *codec)
@@ -903,8 +1018,15 @@ static int msm_new_mixer(struct snd_soc_codec *codec)
 		err = snd_ctl_add(codec->card->snd_card,
 			snd_ctl_new1(&snd_msm_controls[idx], NULL));
 		if (err < 0)
-			MM_ERR("ERR adding ctl\n");
+			MM_ERR("ERR adding ctl 1\n");
 	}
+	for (idx = 0; idx < ARRAY_SIZE(snd_lb_controls); idx++) {
+		err = snd_ctl_add(codec->card->snd_card,
+			snd_ctl_new1(&snd_lb_controls[idx], NULL));
+		if (err < 0)
+			MM_ERR("ERR adding ctl 2\n");
+	}
+	
 	dev_cnt = msm_snddev_devcount();
 
 	for (idx = 0; idx < dev_cnt; idx++) {
@@ -916,7 +1038,7 @@ static int msm_new_mixer(struct snd_soc_codec *codec)
 		} else
 			return 0;
 	}
-	simple_control = ARRAY_SIZE(snd_msm_controls);
+	simple_control = ARRAY_SIZE(snd_msm_controls)+ARRAY_SIZE(snd_lb_controls);
 	device_index = simple_control + 1;
 	return 0;
 }

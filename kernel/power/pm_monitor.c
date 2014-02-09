@@ -45,7 +45,6 @@ struct pm_monitor {
   struct semaphore sem;
   wait_queue_head_t rqueue;
 };
-/*huangyanjun 2010-04-02 begin ZTE_HYJ_ADD_NOTIFY_USER_WHEN_SUSPEND*/
 static int pm_monitor_open(struct inode *inodp,  struct file *filp);
 static ssize_t pm_monitor_read(struct file *filp,  char __user *buff,  size_t count, loff_t *f_pos);
 //static ssize_t pm_monitor_write(struct file *filp, const char __user *buff, size_t count, loff_t *f_pos);
@@ -64,7 +63,6 @@ static struct miscdevice pm_monitor_device = {
 	.name		= "pm_monitor",
 	.fops		= &pm_monitor_fops,
 };
-/*huangyanjun 2010-04-02 end ZTE_HYJ_ADD_NOTIFY_USER_WHEN_SUSPEND*/
 static struct pm_monitor *dev = NULL;
 extern struct msm_pm_smem_t * get_msm_pm_smem_data(void);
 
@@ -97,7 +95,7 @@ static ssize_t pm_monitor_wakeup_info_show(struct device *devp, struct device_at
 
 #define ZTE_GET_AMSS_SLEEP_TIME
 #ifdef ZTE_GET_AMSS_SLEEP_TIME	//ZTE_POWER_ZENGHUIPENG_20110212 add
-#include "../../arch/arm/mach-msm/proc_comm.h"
+#include <mach/proc_comm.h>
 #define ZTE_PROC_COMM_CMD3_RECORD_GET_AMSS_SLEEPTIME 8
 static ssize_t pm_monitor_amss_sleep_time_show(struct device *devp, struct device_attribute *attr, char *buf)
 {
@@ -125,10 +123,9 @@ unsigned pm_modem_sleep_time_get(void)
 #endif
 
 
-//ZTE_POWER_ZENGHUIPENG_20110212 add end
 #define ZTE_FEATURE_GET_CHIP_VERSION_APP	//LHX_PM_20110525_01 add code to get chip version for APP
 #ifdef ZTE_FEATURE_GET_CHIP_VERSION_APP
-#include "../../arch/arm/mach-msm/proc_comm.h"
+#include <mach/proc_comm.h>
 #define ZTE_PROC_COMM_CMD3_GET_CHIP_VERSION 10
 #define ZTE_PROC_COMM_CMD3_GET_HW_MSM_VERSION 11
 static ssize_t pm_monitor_chip_version_show(struct device *devp, struct device_attribute *attr, char *buf)
@@ -161,7 +158,6 @@ static DEVICE_ATTR(hw_msm_version, S_IRUGO, pm_monitor_hw_msm_version_show, NULL
 
 static DEVICE_ATTR(wakeup_info, S_IRUGO, pm_monitor_wakeup_info_show, NULL);
 
-/*ZTE_HYJ_PARSE_WAKEUP_INFO  2010.0126  begin*/
 
 #define ID_WAKEUP_REASON	0
 #define ID_WAKEUP_PROG		1
@@ -353,7 +349,6 @@ static struct map_id_to_name pm_monitor_oncrpc_prog[] = {
 	{ 0X3000ffff, "ONCRPC_DAEMON_MSGPROG" },
 	{ 0x3001006b, "OEM_RAPI_FUSION" },//new for 7x30 2030
 	{ 0x300100b2, "RFTXPLIM_POWER_MM_FUSIONPROG" },//new for 7x30 2030
-	/*ZTE_HYJ_ADD_MAP_PROG_ID_TO_NAME  02/02/2001 begin*/
 	{ 0x31000000, "CM CB" },
 	{ 0x31000001, "DB CB" },
 	{ 0x31000002, "SND CB" },
@@ -511,7 +506,6 @@ static struct map_id_to_name pm_monitor_oncrpc_prog[] = {
 	{ 0X3100ffff, "RPC_ROUTER_SERVER_PROGRAM CB" },
 	{ 0x3101006b, "OEM_RAPI_FUSION" },
 	{ 0x310100b2, "RFTXPLIM_POWER_MM_FUSIONCBPROG" },
-		/*ZTE_HYJ_ADD_MAP_PROG_ID_TO_NAME 02/02/2001 end*/
 };
 
 #else
@@ -835,7 +829,6 @@ static struct map_id_to_name_tbl pm_monitor_tbl[] = {
 	}
 	return 0;
 }
-/*ZTE_HYJ_PARSE_WAKEUP_INFO  2010.0126  end*/
 
  /*
  * get_current_time
@@ -870,7 +863,6 @@ static int pm_monitor_save_info(int pm_state,char *buf)
 		len = p_buf - buf;
 		return len;
 	} else {
-	//ZTE_ZHENFCHAO_20100916
 		printk("[PM] additional wakeup info:\n");
 		printk("\twakeupreason:0x%x\n\trpc_prog:0x%x\n\trpc_proc:0x%x\n",get_msm_pm_smem_data()->wakeup_reason,
 																get_msm_pm_smem_data()->rpc_prog,
@@ -879,10 +871,8 @@ static int pm_monitor_save_info(int pm_state,char *buf)
 	 	p_buf += get_current_time(p_buf);
 		p_buf+= sprintf(p_buf, "%s\n","resume");
 		p_buf+= sprintf(p_buf, "WakeupReason:%s\tRpcProg:%s\tRpcProc:0x%x\tSmdPortName:%s\t  GpioInfo:0x%x\n",
-			/*ZTE_HYJ_PARSE_WAKEUP_INFO  2010.0126  begin*/			
 			pm_parse_wakeup_reason(ID_WAKEUP_REASON,get_msm_pm_smem_data()->wakeup_reason),
 			pm_parse_wakeup_reason(ID_WAKEUP_PROG,get_msm_pm_smem_data()->rpc_prog),
-			/*ZTE_HYJ_PARSE_WAKEUP_INFO  2010.0126  end*/				
 			get_msm_pm_smem_data()->rpc_proc,
 			get_msm_pm_smem_data()->smd_port_name,
 			get_msm_pm_smem_data()->reserved2);
@@ -896,7 +886,7 @@ static int pm_monitor_save_info(int pm_state,char *buf)
 /*
  * pm_state_changed
  */
-extern int	sleep_ok_to_print_wakeup_info;	//zte-ccb-20120608 defined in pm2.c
+extern int	sleep_ok_to_print_wakeup_info;
 static void pm_state_changed(struct pm_monitor *sdev, int state)
 {
 	char event_string[17];
@@ -912,13 +902,11 @@ static void pm_state_changed(struct pm_monitor *sdev, int state)
 		}
 		up(&dev->sem);
 		
-		if(sleep_ok_to_print_wakeup_info)	//zte-ccb-20120608 no need to record fake wakeup
+		if(sleep_ok_to_print_wakeup_info)
 		pm_monitor_save_info(state,&sdev->wakeup_info[sdev->info_index++][0]);
 		
-		/*ZTE_HYJ_ADD_WAKEUP_INFO_TO_LOG  01/22/10 begin*/
 		if(sdev->pm_state == RESUME_STATE) {
-			//PMDPRINTK("%s\n",&sdev->wakeup_info[sdev->info_index - 1][0]);//zte-ccb-20120608
-			if(sleep_ok_to_print_wakeup_info){	//zte-ccb-20120608 no need to record fake wakeup
+			if(sleep_ok_to_print_wakeup_info){
 				pr_info("%s\n",&sdev->wakeup_info[sdev->info_index - 1][0]);
 				sleep_ok_to_print_wakeup_info = 0;
 			}
@@ -930,7 +918,6 @@ static void pm_state_changed(struct pm_monitor *sdev, int state)
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(HZ/20);
 		}
-		/*ZTE_HYJ_ADD_WAKEUP_INFO_TO_LOG  01/22/10 end*/
 
 err:
         return ;
@@ -962,7 +949,6 @@ static struct notifier_block pm_monitor_suspend_notifier = {
 	.notifier_call = pm_suspend_notifier,
 };
 
-/*huangyanjun 2010-04-02 begin ZTE_HYJ_ADD_NOTIFY_USER_WHEN_SUSPEND*/
 static int pm_monitor_open(struct inode *inodp, struct file *filp)
 {
 	printk("%s exit\n",__FUNCTION__);
@@ -1020,7 +1006,6 @@ static int pm_monitor_release(struct inode *inodp, struct file *filp)
 	printk("%s enter\n",__FUNCTION__);
 	return 0;
 }
-/*huangyanjun 2010-04-02 end  ZTE_HYJ_ADD_NOTIFY_USER_WHEN_SUSPEND*/
 /*
  * pm_monitor_init
  */

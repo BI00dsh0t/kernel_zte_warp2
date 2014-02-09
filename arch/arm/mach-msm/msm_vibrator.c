@@ -15,6 +15,7 @@
  *
  */
 /*
+
 */
 
 #define DEBUG  1
@@ -24,6 +25,7 @@
 #include <linux/err.h>
 #include <linux/hrtimer.h>
 #include <linux/sched.h>
+#include <linux/module.h>
 #include "pmic.h"
 #include "timed_output.h"
 
@@ -63,7 +65,7 @@ static volatile int g_vibrator_status=0;//represent the vibrator's real on off s
 struct timespec volatile g_ts_start;
 struct timespec volatile g_ts_end;
 #endif
-static int vibrator_on_delay;			
+static int vibrator_on_delay;			//chenchongbao.20111218
 
 #ifdef CONFIG_PM8XXX_RPC_VIBRATOR
 static void set_pmic_vibrator(int on)
@@ -92,11 +94,11 @@ static void set_pmic_vibrator(int on)
         {
 		struct rpc_request_hdr hdr;
 		uint32_t data;
-    	}req;
+	} req;
 
     if (!vib_endpoint)
     {
-	vib_endpoint = msm_rpc_connect(PM_LIBPROG, PM_LIBVERS, 0);
+		vib_endpoint = msm_rpc_connect(PM_LIBPROG, PM_LIBVERS, 0);
         if (IS_ERR(vib_endpoint))
         {
 			printk(KERN_ERR "init vib rpc failed!\n");
@@ -124,7 +126,7 @@ static void set_pmic_vibrator(int on)
     {
         if(g_vibrator_status==1)
         {
-        	   g_vibrator_status=0;	
+        	   g_vibrator_status=0;	//chenchongbao.20111218
 #if DEBUG
             g_ts_end = current_kernel_time();
             pr_info(ZHY_VIB_TAG"vibrated %ld ms.\n",
@@ -132,7 +134,7 @@ static void set_pmic_vibrator(int on)
 #endif
         }
         }
-    }
+}
 #endif
 
 static void pmic_vibrator_on(struct work_struct *work)
@@ -140,7 +142,7 @@ static void pmic_vibrator_on(struct work_struct *work)
     if( g_vibrator_status==0)//if vibrator is on now
     {
         debug_print("on_start");
-        set_pmic_vibrator(1);
+	set_pmic_vibrator(1);
         debug_print("on_done\n");
     }
     else
@@ -148,7 +150,7 @@ static void pmic_vibrator_on(struct work_struct *work)
         //debug_print("Q:pmic_vibrator_on, already on, do nothing.\n");
     }
 	vibrator_on_delay = (vibrator_on_delay > 15000 ? 15000 : vibrator_on_delay);	//moved from enable fun & modified chenchongbao.20111218
-	hrtimer_start(&vibe_timer,
+	hrtimer_start(&vibe_timer,	/* chenchongbao.20111218 moved from enable fun & modified */
                       ktime_set(vibrator_on_delay / 1000, (vibrator_on_delay % 1000 ) * 1000000),
                       HRTIMER_MODE_REL);
 }
@@ -158,7 +160,7 @@ static void pmic_vibrator_off(struct work_struct *work)
     if( g_vibrator_status==1)//if vibrator is on now
     {
         debug_print("off_start");
-        set_pmic_vibrator(0);
+	set_pmic_vibrator(0);
         debug_print("off_done");
     }
     else
@@ -189,7 +191,7 @@ static int timed_vibrator_off(struct timed_output_dev *sdev)
 
 static void vibrator_enable(struct timed_output_dev *dev, int value)
 {
-    hrtimer_cancel(&vibe_timer);
+	hrtimer_cancel(&vibe_timer);
     cancel_work_sync(&work_vibrator_on);
     cancel_work_sync(&work_vibrator_off);
 
@@ -201,22 +203,22 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
         {
         	   pr_info(ZHY_VIB_TAG" vibrator_enable, queue failed!\n");
             value=10;
-            hrtimer_start(&vibe_timer,
-                          ktime_set(value / 1000, (value % 1000) * 1000000),
-                          HRTIMER_MODE_REL);
+		hrtimer_start(&vibe_timer,
+			      ktime_set(value / 1000, (value % 1000) * 1000000),
+			      HRTIMER_MODE_REL);
             value=0;
         }
     }
     else
     {
-        //value = (value > 15000 ? 15000 : value);	
-	vibrator_on_delay = value;	
+        //value = (value > 15000 ? 15000 : value);	//we put it in work fun. 20111218
+	vibrator_on_delay = value;	//chenchongbao.20111218
         timed_vibrator_on(dev);
 
-        //hrtimer_start(&vibe_timer,	
+        //hrtimer_start(&vibe_timer,		//chenchongbao.20111218 : we put it to workqueue fun
         //              ktime_set(value / 1000, (value % 1000 + VIB_OFF_DELAY) * 1000000),
         //              HRTIMER_MODE_REL);
-    }
+	}
 }
 
 static int vibrator_get_time(struct timed_output_dev *dev)
@@ -242,11 +244,11 @@ static enum hrtimer_restart vibrator_timer_func(struct hrtimer *timer)
                       HRTIMER_MODE_REL);
         value=0;
     }
-    return HRTIMER_NORESTART;
+	return HRTIMER_NORESTART;
 }
 
 static struct timed_output_dev pmic_vibrator =
-    {
+{
 	.name = "vibrator",
 	.get_time = vibrator_get_time,
 	.enable = vibrator_enable,

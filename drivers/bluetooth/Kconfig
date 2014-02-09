@@ -268,7 +268,7 @@ config MSM_BT_POWER
 	help
 	  Provides a parameter to switch on/off power from PMIC
 	  to Bluetooth device.
-	  
+
 config MSM_BCM_POWER
 	tristate "MSM BCM Power Control"
 	depends on ARCH_MSM && RFKILL

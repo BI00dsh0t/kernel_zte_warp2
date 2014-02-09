@@ -49,8 +49,9 @@
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
 
-static int enable_mgmt = 1;
+static bool enable_mgmt = 1;
 
+int nHCIDEVUP ;
 /* ----- HCI socket interface ----- */
 
 static inline int hci_test_bit(int nr, void *addr)
@@ -328,12 +329,19 @@ static int hci_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long a
 	case HCIDEVUP:
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
-
+		nHCIDEVUP++;
+              printk("stone receive HCIDEVUP in hci_sock_ioctl nHCIDEVUP = %d \n",nHCIDEVUP);
 		err =  hci_dev_open(arg);
 		if (!err || err == -EALREADY)
+		{
+		       printk("stone receive HCIDEVUP in hci_sock_ioctl nHCIDEVUP = %d err1 = %d \n",nHCIDEVUP,err);
 			return 0;
+		}
 		else
+		{
+		       printk("stone receive HCIDEVUP in hci_sock_ioctl nHCIDEVUP = %d err2 = %d \n",nHCIDEVUP,err);
 			return err;
+		}
 
 	case HCIDEVDOWN:
 		if (!capable(CAP_NET_ADMIN))

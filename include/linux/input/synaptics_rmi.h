@@ -99,12 +99,10 @@ struct synaptics_rmi_data{
 //	int gpio_irq;
 	int max_y_position;	// maxmum y position when enable vkeys
 	struct hrtimer timer;
-	//struct hrtimer resume_timer;  //ZTE_WLY_CRDB00512790
 	struct work_struct  work;
 	__u16 max[2];			// maxmum x/y position supported
 	__u16 xres[2];			// LCD x,y resolution
 	struct early_suspend early_suspend;
-//	__u32 dup_threshold;    //ZTE_XUKE_TOUCH_THRESHOLD_20100201
 
 	__u8 points_supported;
 	//__u8 orientation;

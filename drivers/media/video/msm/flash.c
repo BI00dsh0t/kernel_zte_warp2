@@ -1,5 +1,5 @@
 
-/* Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,6 +11,7 @@
  * GNU General Public License for more details.
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/leds-pmic8058.h>
@@ -21,6 +22,7 @@
 #include <mach/pmic.h>
 #include <mach/camera.h>
 #include <mach/gpio.h>
+
 /*
  * Commented by YGL_CAM_20100605
  * Add process for flash LED
@@ -30,13 +32,9 @@
 /*
  * Camera Flash LED GPIO setting according to ARM9 AMSS
  */
-#if defined(CONFIG_MACH_JOE) || defined(CONFIG_MACH_SKATE)
-#define MSM_CAMERA_FLASH_LED_GPIO   (88)
-#elif defined(CONFIG_MACH_BLADEPLUS)|| defined(CONFIG_MACH_ARTHUR) ||defined(CONFIG_MACH_SKATEPLUS) || defined(CONFIG_MACH_SEAN)|| defined(CONFIG_MACH_WARP2)
+
 #define MSM_CAMERA_FLASH_LED_GPIO   (127)
-#else
-#define MSM_CAMERA_FLASH_LED_GPIO   (255)   // illegal value
-#endif
+
 /*
  * Flash LED Status
  * 1: enable Flash LED
@@ -49,125 +47,10 @@ uint32_t flash_led_enable = 0;
 //static struct msm_camera_sensor_info *sensor_data;
 enum msm_cam_flash_stat{
 	MSM_CAM_FLASH_OFF,
-	MSM_CAM_FLASH_AUTO,	//add Auto mode for flash LED, ZTE_CAM_LJ_20120616
+	MSM_CAM_FLASH_AUTO,	
 	MSM_CAM_FLASH_ON,
 };
 
-#if defined CONFIG_MSM_CAMERA_FLASH_SC628A
-static struct i2c_client *sc628a_client;
-
-static const struct i2c_device_id sc628a_i2c_id[] = {
-	{"sc628a", 0},
-	{ }
-};
-
-static int32_t sc628a_i2c_txdata(unsigned short saddr,
-		unsigned char *txdata, int length)
-{
-	struct i2c_msg msg[] = {
-		{
-			.addr = saddr,
-			.flags = 0,
-			.len = length,
-			.buf = txdata,
-		},
-	};
-	if (i2c_transfer(sc628a_client->adapter, msg, 1) < 0) {
-		CDBG("sc628a_i2c_txdata faild 0x%x\n", saddr);
-		return -EIO;
-	}
-
-	return 0;
-}
-
-static int32_t sc628a_i2c_write_b_flash(uint8_t waddr, uint8_t bdata)
-{
-	int32_t rc = -EFAULT;
-	unsigned char buf[2];
-	if (!sc628a_client)
-		return  -ENOTSUPP;
-
-	memset(buf, 0, sizeof(buf));
-	buf[0] = waddr;
-	buf[1] = bdata;
-
-	rc = sc628a_i2c_txdata(sc628a_client->addr>>1, buf, 2);
-	if (rc < 0) {
-		CDBG("i2c_write_b failed, addr = 0x%x, val = 0x%x!\n",
-				waddr, bdata);
-	}
-	usleep_range(4000, 5000);
-
-	return rc;
-}
-
-static int sc628a_i2c_probe(struct i2c_client *client,
-		const struct i2c_device_id *id)
-{
-	int rc = 0;
-	CDBG("sc628a_probe called!\n");
-
-	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
-		pr_err("i2c_check_functionality failed\n");
-		goto probe_failure;
-	}
-
-	sc628a_client = client;
-
-	CDBG("sc628a_probe successed! rc = %d\n", rc);
-	return 0;
-
-probe_failure:
-	pr_err("sc628a_probe failed! rc = %d\n", rc);
-	return rc;
-}
-
-static struct i2c_driver sc628a_i2c_driver = {
-	.id_table = sc628a_i2c_id,
-	.probe  = sc628a_i2c_probe,
-	.remove = __exit_p(sc628a_i2c_remove),
-	.driver = {
-		.name = "sc628a",
-	},
-};
-#endif
-#if 0
-static int config_flash_gpio_table(enum msm_cam_flash_stat stat,
-			struct msm_camera_sensor_strobe_flash_data *sfdata)
-{
-	int rc = 0, i = 0;
-	int msm_cam_flash_gpio_tbl[][2] = {
-		{sfdata->flash_trigger, 1},
-		{sfdata->flash_charge, 1},
-		{sfdata->flash_charge_done, 0}
-	};
-
-	if (stat == MSM_CAM_FLASH_ON) {
-		for (i = 0; i < ARRAY_SIZE(msm_cam_flash_gpio_tbl); i++) {
-			rc = gpio_request(msm_cam_flash_gpio_tbl[i][0],
-							  "CAM_FLASH_GPIO");
-			if (unlikely(rc < 0)) {
-				pr_err("%s not able to get gpio\n", __func__);
-				for (i--; i >= 0; i--)
-					gpio_free(msm_cam_flash_gpio_tbl[i][0]);
-				break;
-			}
-			if (msm_cam_flash_gpio_tbl[i][1])
-				gpio_direction_output(
-					msm_cam_flash_gpio_tbl[i][0], 0);
-			else
-				gpio_direction_input(
-					msm_cam_flash_gpio_tbl[i][0]);
-		}
-	} else {
-		for (i = 0; i < ARRAY_SIZE(msm_cam_flash_gpio_tbl); i++) {
-			gpio_direction_input(msm_cam_flash_gpio_tbl[i][0]);
-			gpio_free(msm_cam_flash_gpio_tbl[i][0]);
-		}
-	}
-	return rc;
-}
-#endif
 static int zte_flash_auto_flag;
 
 void zte_flash_auto_flag_set_value(int val)
@@ -180,6 +63,25 @@ int zte_get_flash_auto_flag_value(void)
    return zte_flash_auto_flag;
 }
 
+int zte_get_flash_current_state( void)
+{
+    if (flash_led_enable==1)
+    {
+        //MSM_LED_MODE_ON
+        return 1;
+
+    }
+    else if(flash_led_enable==2)
+    {
+      //MSM_LED_MODE_AUTO
+       if(zte_get_flash_auto_flag_value()== 1)
+	 {
+	    return 1;
+          }  
+     }
+	
+     return 0;
+}
 /*
  * Flash LED GPIO Setting
  * 1: pull up GPIO
@@ -196,14 +98,14 @@ static int32_t msm_camera_flash_set_led_gpio(int32_t gpio_val)
 	
     if (rc!=0)
     {
-	gpio_free(MSM_CAMERA_FLASH_LED_GPIO);
-        rc = msm_camera_flash_set_led_gpio(gpio_val);
+        //gpio_free(MSM_CAMERA_FLASH_LED_GPIO);
+	rc = gpio_direction_output(MSM_CAMERA_FLASH_LED_GPIO, gpio_val);
+        //rc = msm_camera_flash_set_led_gpio(gpio_val);
     }
     else
     {
         /* ignore "rc" */
         rc = gpio_direction_output(MSM_CAMERA_FLASH_LED_GPIO, gpio_val);
-		CDBG("%s: gpio_direction_output rc=0x%x,MSM_CAMERA_FLASH_LED_GPIO=%d\n", __func__, rc,MSM_CAMERA_FLASH_LED_GPIO);
 
     }
     gpio_free(MSM_CAMERA_FLASH_LED_GPIO);
@@ -216,82 +118,30 @@ int msm_camera_flash_current_driver(
 	unsigned led_state)
 {
 	int rc = 0;
-#if defined CONFIG_LEDS_PMIC8058
-	int idx;
-	const struct pmic8058_leds_platform_data *driver_channel =
-		current_driver->driver_channel;
-	int num_leds = driver_channel->num_leds;
 
-	CDBG("%s: led_state = %d\n", __func__, led_state);
-
-	/* Evenly distribute current across all channels */
-	switch (led_state) {
-	case MSM_CAMERA_LED_OFF:
-		for (idx = 0; idx < num_leds; ++idx) {
-			rc = pm8058_set_led_current(
-				driver_channel->leds[idx].id, 0);
-			if (rc < 0)
-				pr_err(
-					"%s: FAIL name = %s, rc = %d\n",
-					__func__,
-					driver_channel->leds[idx].name,
-					rc);
-		}
-		break;
-
-	case MSM_CAMERA_LED_LOW:
-		for (idx = 0; idx < num_leds; ++idx) {
-			rc = pm8058_set_led_current(
-				driver_channel->leds[idx].id,
-				current_driver->low_current/num_leds);
-			if (rc < 0)
-				pr_err(
-					"%s: FAIL name = %s, rc = %d\n",
-					__func__,
-					driver_channel->leds[idx].name,
-					rc);
-		}
-		break;
-
-	case MSM_CAMERA_LED_HIGH:
-		for (idx = 0; idx < num_leds; ++idx) {
-			rc = pm8058_set_led_current(
-				driver_channel->leds[idx].id,
-				current_driver->high_current/num_leds);
-			if (rc < 0)
-				pr_err(
-					"%s: FAIL name = %s, rc = %d\n",
-					__func__,
-					driver_channel->leds[idx].name,
-					rc);
-		}
-		break;
-	case MSM_CAMERA_LED_INIT:
-	case MSM_CAMERA_LED_RELEASE:
-		break;
-
-	default:
-		rc = -EFAULT;
-		break;
-	}
-	CDBG("msm_camera_flash_led_pmic8058: return %d\n", rc);
-#endif /* CONFIG_LEDS_PMIC8058 */
 	return rc;
 }
 
 void  msm_camera_set_flash_torch_mode(int32_t times)
 {
 	int level;
+	int rc;
 	pr_err("lijing:set flash times=%d\n",times);
+	rc = gpio_request(MSM_CAMERA_FLASH_LED_GPIO, "flashled-gpio");
 	for(level = 0;level < times;level++)
 	{
-		gpio_set_value(MSM_CAMERA_FLASH_LED_GPIO, 1);
+		//gpio_set_value(MSM_CAMERA_FLASH_LED_GPIO, 1);
+		gpio_direction_output(MSM_CAMERA_FLASH_LED_GPIO, 1);
 		udelay(2);
-		gpio_set_value(MSM_CAMERA_FLASH_LED_GPIO, 0);
+		//gpio_set_value(MSM_CAMERA_FLASH_LED_GPIO, 0);
+		gpio_direction_output(MSM_CAMERA_FLASH_LED_GPIO, 0);
 		udelay(2);
 	}
-	gpio_set_value(MSM_CAMERA_FLASH_LED_GPIO, 1);
+	//gpio_set_value(MSM_CAMERA_FLASH_LED_GPIO, 1);
+	gpio_direction_output(MSM_CAMERA_FLASH_LED_GPIO, 1);
+	gpio_free(MSM_CAMERA_FLASH_LED_GPIO);
 }
+
 /*
  * Refer to MSM_CAM_IOCTL_FLASH_LED_CFG used by mm-camera in user space
  * flash_led_enable is set in apps's menu item selected by user
@@ -299,95 +149,101 @@ void  msm_camera_set_flash_torch_mode(int32_t times)
  * 1: enable Flash LED
  */
 int32_t msm_camera_flash_set_led_state(struct msm_camera_sensor_flash_data *fdata,
-                                                 unsigned led_state)
+		unsigned led_state)
 {
     int32_t rc = 0;
 
-    CDBG("%s: led_state: %d\n", __func__, led_state);
 	pr_err("%s: led_state: %d,fdata->flash_type=%d\n", __func__, led_state,fdata->flash_type);
 
     if (fdata->flash_type != MSM_CAMERA_FLASH_LED)
     {
 		return -ENODEV;
     }
-	
+
     switch(led_state)
     {
         case MSM_CAMERA_LED_OFF:
+			if( __gpio_get_value(MSM_CAMERA_FLASH_LED_GPIO))
 			msm_camera_flash_set_led_gpio(0);
-            flash_led_enable = 0;
             break;
 
         case MSM_CAMERA_LED_LOW:
-			msm_camera_set_flash_torch_mode(13);
+			if (flash_led_enable==1)
+            {//MSM_LED_MODE_ON
+              msm_camera_set_flash_torch_mode(5);
+            }
+		    else if(flash_led_enable==2)
+		    {
+		      //MSM_LED_MODE_AUTO
+		       if(zte_get_flash_auto_flag_value()== 1)
+			   {
+		          msm_camera_set_flash_torch_mode(5);
+		       }  
+			}
+			
 			break;
+			
         case MSM_CAMERA_LED_HIGH:
-            /*
-               * MSM_CAMERA_LED_LOW is as same as MSM_CAMERA_LED_HIGH
-               */
-            CDBG("%s: set MSM_CAMERA_LED_LOW/MSM_CAMERA_LED_HIGH\n", __func__);
-			pr_err("%s: set MSM_CAMERA_LED_LOW/MSM_CAMERA_LED_HIGH\n", __func__);
+            msm_camera_flash_led_enable();
+            break;
 
-            flash_led_enable = 1;
+        case MSM_CAMERA_LED_RELEASE:
+			if( __gpio_get_value(MSM_CAMERA_FLASH_LED_GPIO))
+			 msm_camera_flash_set_led_gpio(0);
             break;
 
         default:
-            flash_led_enable = 0;
             rc = -EFAULT;
-            CDBG("%s: rc=%d\n", __func__, rc);
 			pr_err("%s: rc=%d\n", __func__, rc);
 
             return rc;
     }
 
-    CDBG("%s: rc=%d\n", __func__, rc);
-    pr_err("%s: rc=%d\n", __func__, rc);
-
     return rc;
 }
 
-/*
-  * add Auto mode for flash LED, ZTE_CAM_LJ_20120616
-  */
+
 int32_t msm_camera_flash_set_led_mode(struct msm_camera_sensor_flash_data *fdata,
                                                  unsigned led_mode)
 {
     int32_t rc = 0;
 
-    CDBG("%s: led_mode: %d\n", __func__, led_mode);
-	
-    if (fdata->flash_type != MSM_CAMERA_FLASH_LED)
-    {
-		return -ENODEV;
-    }
-	
+    pr_err("%s: led_mode: %d\n", __func__, led_mode);
+
+   if(fdata)
+   {
+	    if (fdata->flash_type != MSM_CAMERA_FLASH_LED)
+	    {
+	             pr_err("%s: flash type not support\n", __func__);
+			return -ENODEV;
+	    }
+   }
+
     switch(led_mode)
     {
         case MSM_LED_MODE_OFF:
 	     msm_camera_flash_set_led_gpio(0);
             flash_led_enable = 0;
-            break;
+		break;
 
         case MSM_LED_MODE_ON:
             flash_led_enable = 1;
-            break;
+		break;
 
 	case MSM_LED_MODE_AUTO:
             flash_led_enable = 2;
-            break;
+		break;
 
 	case MSM_LED_MODE_TORCH:
 		msm_camera_set_flash_torch_mode(13);
-	break;
-			
-        default:
-            flash_led_enable = 0;
-            rc = -EFAULT;
+		break;
+
+	default:
+            //flash_led_enable = 0;
+		rc = -EFAULT;
             CDBG("%s: rc=%d\n", __func__, rc);
             return rc;
     }
-
-    CDBG("%s: rc=%d\n", __func__, rc);
 
     return rc;
 }
@@ -396,14 +252,11 @@ int32_t msm_camera_flash_set_led_mode(struct msm_camera_sensor_flash_data *fdata
 /*
  * External Function
  */
-/*
-  * add Auto mode for flash LED, ZTE_CAM_LJ_20120616
-  */
+
 int32_t msm_camera_flash_led_enable(void)
 {
     int32_t gpio_val;
     int32_t rc = 0;
-	CDBG("%s: entry: flash_led_enable=%d\n", __func__, flash_led_enable);
     pr_err("%s: entry: flash_led_enable=%d\n", __func__, flash_led_enable);
 
     if (flash_led_enable==1)
@@ -411,7 +264,6 @@ int32_t msm_camera_flash_led_enable(void)
         //MSM_LED_MODE_ON
         gpio_val = 1;
         rc = msm_camera_flash_set_led_gpio(gpio_val);
-		pr_err("%s: entry: rc=0x%x\n", __func__, rc);
 
     }
     else if(flash_led_enable==2)
@@ -422,9 +274,9 @@ int32_t msm_camera_flash_led_enable(void)
 	    gpio_val = 1;
             rc = msm_camera_flash_set_led_gpio(gpio_val);
           }  
-    }
+	}
 
-    return rc;
+	return rc;
 }
 /*
  * External Function
@@ -441,6 +293,27 @@ int32_t msm_camera_flash_led_disable(void)
 
     return rc;
 }
+
+int msm_flash_ctrl(struct msm_camera_sensor_info *sdata,
+	struct flash_ctrl_data *flash_info)
+{
+	int rc = 0;
+	//sensor_data = sdata;
+	switch (flash_info->flashtype) {
+	case LED_FLASH:
+		rc = msm_camera_flash_set_led_state(sdata->flash_data,
+			flash_info->ctrl_data.led_state);
+			break;
+	//case STROBE_FLASH:
+	//	rc = msm_strobe_flash_ctrl(sdata->strobe_flash_data,
+	//		&(flash_info->ctrl_data.strobe_ctrl));
+	//	break;
+	default:
+		pr_err("Invalid Flash MODE\n");
+		rc = -EINVAL;
+	}
+	return rc;
+}
 #else
 int msm_camera_flash_external(
 	struct msm_camera_sensor_flash_external *external,
@@ -452,14 +325,14 @@ int msm_camera_flash_external(
 	switch (led_state) {
 
 	case MSM_CAMERA_LED_INIT:
-		if (!sc628a_client) {
-			rc = i2c_add_driver(&sc628a_i2c_driver);
-			if (rc < 0 || sc628a_client == NULL) {
-				rc = -ENOTSUPP;
+			if (!sc628a_client) {
+				rc = i2c_add_driver(&sc628a_i2c_driver);
+				if (rc < 0 || sc628a_client == NULL) {
+					rc = -ENOTSUPP;
 				CDBG("I2C add driver failed");
-				return rc;
+					return rc;
+				}
 			}
-		}
 #if defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)
 		if (external->expander_info && !sx150x_client) {
 			struct i2c_adapter *adapter =
@@ -469,19 +342,19 @@ int msm_camera_flash_external(
 					external->expander_info->board_info);
 			if (!sx150x_client || !adapter) {
 				rc = -ENOTSUPP;
-				i2c_del_driver(&sc628a_i2c_driver);
-				sc628a_client = NULL;
+					i2c_del_driver(&sc628a_i2c_driver);
+					sc628a_client = NULL;
 				return rc;
 			}
 		}
 #endif
-		rc = gpio_request(external->led_en, "sc628a");
+			rc = gpio_request(external->led_en, "sc628a");
 		if (!rc) {
 			gpio_direction_output(external->led_en, 1);
 		} else {
 			goto err1;
 		}
-		rc = gpio_request(external->led_flash_en, "sc628a");
+			rc = gpio_request(external->led_flash_en, "sc628a");
 		if (!rc) {
 			gpio_direction_output(external->led_flash_en, 1);
 			break;
@@ -491,8 +364,8 @@ int msm_camera_flash_external(
 		gpio_free(external->led_en);
 
 err1:
-		i2c_del_driver(&sc628a_i2c_driver);
-		sc628a_client = NULL;
+			i2c_del_driver(&sc628a_i2c_driver);
+			sc628a_client = NULL;
 
 		break;
 
@@ -514,25 +387,25 @@ err1:
 	case MSM_CAMERA_LED_OFF:
 		rc = sc628a_i2c_write_b_flash(0x02, 0x0);
 		if (sc628a_client) {
-			gpio_set_value_cansleep(external->led_en, 0);
-			gpio_set_value_cansleep(external->led_flash_en, 0);
+		gpio_set_value_cansleep(external->led_en, 0);
+		gpio_set_value_cansleep(external->led_flash_en, 0);
 		}
 		break;
 
 	case MSM_CAMERA_LED_LOW:
 		if (sc628a_client) {
-			gpio_set_value_cansleep(external->led_en, 1);
-			gpio_set_value_cansleep(external->led_flash_en, 1);
-			usleep_range(2000, 3000);
+		gpio_set_value_cansleep(external->led_en, 1);
+		gpio_set_value_cansleep(external->led_flash_en, 1);
+		usleep_range(2000, 3000);
 		}
 		rc = sc628a_i2c_write_b_flash(0x02, 0x06);
 		break;
 
 	case MSM_CAMERA_LED_HIGH:
 		if (sc628a_client) {
-			gpio_set_value_cansleep(external->led_en, 1);
-			gpio_set_value_cansleep(external->led_flash_en, 1);
-			usleep_range(2000, 3000);
+		gpio_set_value_cansleep(external->led_en, 1);
+		gpio_set_value_cansleep(external->led_flash_en, 1);
+		usleep_range(2000, 3000);
 		}
 		rc = sc628a_i2c_write_b_flash(0x02, 0x49);
 		break;

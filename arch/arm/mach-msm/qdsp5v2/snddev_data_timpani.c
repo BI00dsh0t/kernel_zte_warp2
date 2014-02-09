@@ -57,7 +57,7 @@ static struct adie_codec_dev_profile iearpiece_ffa_profile = {
 	.setting_sz = ARRAY_SIZE(iearpiece_ffa_settings),
 };
 
- #if (defined(CONFIG_MACH_SEAN)) || (defined(CONFIG_MACH_WARP2)) 
+ #if (defined(CONFIG_MACH_SEAN)) || (defined(CONFIG_MACH_WARP2)) ||defined(CONFIG_MACH_RADIANT) 
 static struct snddev_icodec_data snddev_iearpiece_ffa_data = {
 	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
 	.name = "handset_rx",
@@ -206,7 +206,7 @@ static struct adie_codec_dev_profile ispkr_stereo_profile = {
 	.setting_sz = ARRAY_SIZE(ispkr_stereo_settings),
 };
 
-#if 1 
+#if 1
 static struct snddev_icodec_data snddev_ispkr_stereo_data = {
 	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
 	.name = "speaker_stereo_rx",
@@ -220,9 +220,9 @@ static struct snddev_icodec_data snddev_ispkr_stereo_data = {
 	.pamp_on = msm_snddev_poweramp_on,
 	.pamp_off = msm_snddev_poweramp_off,
 	.max_voice_rx_vol[VOC_NB_INDEX] = 1000,
-	.min_voice_rx_vol[VOC_NB_INDEX] = -500,
+	.min_voice_rx_vol[VOC_NB_INDEX] = -1500,
 	.max_voice_rx_vol[VOC_WB_INDEX] = 1000,
-	.min_voice_rx_vol[VOC_WB_INDEX] = -500
+	.min_voice_rx_vol[VOC_WB_INDEX] = -1500
 };
 #else
 static struct snddev_icodec_data snddev_ispkr_stereo_data = {
@@ -395,10 +395,10 @@ static struct snddev_icodec_data snddev_ihs_stereo_rx_data = {
 	.property = SIDE_TONE_MASK,
 	.voltage_on = msm_snddev_hsed_voltage_on,
 	.voltage_off = msm_snddev_hsed_voltage_off,
-	.max_voice_rx_vol[VOC_NB_INDEX] = -700,
+	.max_voice_rx_vol[VOC_NB_INDEX] = 600, //lll054850
 	.min_voice_rx_vol[VOC_NB_INDEX] = -2200,
-	.max_voice_rx_vol[VOC_WB_INDEX] = -900,
-	.min_voice_rx_vol[VOC_WB_INDEX] = -2400,
+	.max_voice_rx_vol[VOC_WB_INDEX] = 400,
+	.min_voice_rx_vol[VOC_WB_INDEX] = -2400, //lll054850
 };
 
 static struct platform_device msm_headset_stereo_device = {
@@ -648,7 +648,8 @@ static struct snddev_icodec_data snddev_ispkr_mic_data = {
 	.pamp_off = msm_snddev_tx_route_deconfig,
 };
 #else
-static enum hsed_controller ispk_pmctl_id[] = {PM_HSED_CONTROLLER_0};
+
+static enum hsed_controller ispk_pmctl_id[] = {PM_HSED_CONTROLLER_1};//{PM_HSED_CONTROLLER_0};//lll054850 modify for P856S330 without speakerphone mic 20130206 
 
 static struct snddev_icodec_data snddev_ispkr_mic_data = {
 	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
@@ -1016,7 +1017,7 @@ static struct snddev_icodec_data snddev_ihs_stereo_speaker_stereo_rx_data = {
 	.copp_id = 0,
 	.acdb_id = ACDB_ID_HEADSET_STEREO_PLUS_SPKR_STEREO_RX,
 	.profile = &ihs_stereo_speaker_stereo_rx_profile,
-	.channel_mode = 1, 
+	.channel_mode = 1,
 	.default_sample_rate = 48000,
 	.pamp_on = msm_snddev_poweramp_on,
 	.pamp_off = msm_snddev_poweramp_off,
@@ -1231,7 +1232,7 @@ static struct platform_device msm_auxpga_lb_hs_device = {
 static struct platform_device *snd_devices_ffa[] __initdata = {
 	&msm_iearpiece_ffa_device,
 	&msm_imic_ffa_device,
-#if 1
+#if 1//defined(ZTE_FEATURE_HAC)
 	&msm_ihac_rx_device, 	
 #endif
 	&msm_ispkr_stereo_device,

@@ -1,7 +1,25 @@
 /*
  * Broadcom Dongle Host Driver (DHD), Linux monitor network interface
  *
- * $Copyright Open Broadcom Corporation$
+ * Copyright (C) 1999-2011, Broadcom Corporation
+ * 
+ *         Unless you and Broadcom execute a separate written software license
+ * agreement governing use of this software, this software is licensed to you
+ * under the terms of the GNU General Public License version 2 (the "GPL"),
+ * available at http://www.broadcom.com/licenses/GPLv2.php, with the
+ * following added to such license:
+ * 
+ *      As a special exception, the copyright holders of this software give you
+ * permission to link this software with independent modules, and to copy and
+ * distribute the resulting executable under terms of your choice, provided that
+ * you also meet, for each linked independent module, the terms and conditions of
+ * the license of that module.  An independent module is a module which is not
+ * derived from this software.  The special exception does not apply to any
+ * modifications of the software.
+ * 
+ *      Notwithstanding the above, under no circumstances may you combine this
+ * software in any way with any other Broadcom software provided under a license
+ * other than the GPL, without Broadcom's express prior written consent.
  *
  * $Id: wl_linux_mon.c 303266 2011-12-16 00:15:23Z $
  */
@@ -57,14 +75,14 @@ static monitor_interface* ndev_to_monif(struct net_device *ndev);
 static int dhd_mon_if_open(struct net_device *ndev);
 static int dhd_mon_if_stop(struct net_device *ndev);
 static int dhd_mon_if_subif_start_xmit(struct sk_buff *skb, struct net_device *ndev);
-static void dhd_mon_if_set_multicast_list(struct net_device *ndev);
+//static void dhd_mon_if_set_multicast_list(struct net_device *ndev);//added by dongyouwei
 static int dhd_mon_if_change_mac(struct net_device *ndev, void *addr);
 
 static const struct net_device_ops dhd_mon_if_ops = {
 	.ndo_open		= dhd_mon_if_open,
 	.ndo_stop		= dhd_mon_if_stop,
 	.ndo_start_xmit		= dhd_mon_if_subif_start_xmit,
-	.ndo_set_multicast_list = dhd_mon_if_set_multicast_list,
+	//.ndo_set_multicast_list = dhd_mon_if_set_multicast_list,//added by dongyouwei
 	.ndo_set_mac_address 	= dhd_mon_if_change_mac,
 };
 
@@ -213,7 +231,7 @@ fail:
 	dev_kfree_skb(skb);
 	return 0;
 }
-
+#if 0 //added by dongyouwei
 static void dhd_mon_if_set_multicast_list(struct net_device *ndev)
 {
 	monitor_interface* mon_if;
@@ -226,7 +244,7 @@ static void dhd_mon_if_set_multicast_list(struct net_device *ndev)
 		ndev->name, mon_if->real_ndev->name);
 	}
 }
-
+#endif
 static int dhd_mon_if_change_mac(struct net_device *ndev, void *addr)
 {
 	int ret = 0;

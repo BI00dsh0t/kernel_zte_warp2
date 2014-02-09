@@ -45,7 +45,7 @@
   corrects a bug in interrupt pin management in 1.0.7
 
  ******************************************************************************/
-
+#include <linux/module.h>
 #include	<linux/err.h>
 #include	<linux/errno.h>
 #include	<linux/delay.h>

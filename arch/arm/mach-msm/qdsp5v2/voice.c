@@ -64,6 +64,12 @@ static int voice_cmd_device_info(struct voice_data *);
 static int voice_cmd_acquire_done(struct voice_data *);
 static int voice_cmd_audio_loopback_start(struct voice_data *);
 static int voice_cmd_audio_loopback_end(struct voice_data *);
+//lll054850 add for hide menu fens&widevoice
+static int voice_cmd_audio_fens_enable(struct voice_data *);
+static int voice_cmd_audio_fens_disable(struct voice_data *);
+static int voice_cmd_audio_widevoice_enable(struct voice_data *);
+static int voice_cmd_audio_widevoice_disable(struct voice_data *);
+
 static void voice_auddev_cb_function(u32 evt_id,
 			union auddev_evt_data *evt_payload,
 			void *private_data);
@@ -100,6 +106,11 @@ static void voice_auddev_cb_function(u32 evt_id,
 	if ((evt_id != AUDDEV_EVT_START_VOICE) &&
 	    (evt_id != AUDDEV_EVT_END_VOICE) && 
 	    (evt_id != AUDDEV_EVT_AUDIO_LP_START) &&
+	    //lll054850 add for hide menu fens&widevoice
+	    (evt_id != AUDDEV_EVT_DEVICE_FENS_ENABLE) &&
+	    (evt_id != AUDDEV_EVT_DEVICE_FENS_DISABLE) &&
+	    (evt_id != AUDDEV_EVT_DEVICE_WIDEVOICE_ENABLE) &&
+	    (evt_id != AUDDEV_EVT_DEVICE_WIDEVOICE_DISABLE) &&
 	    (evt_id != AUDDEV_EVT_AUDIO_LP_END)) {
 		if (evt_payload == NULL) {
 			MM_ERR(" evt_payload is NULL pointer\n");
@@ -376,6 +387,23 @@ static void voice_auddev_cb_function(u32 evt_id,
 	  	  printk(KERN_ERR "[MyTag]auddev_cb_function: voice_cmd_audio_loopback_end()\n");
 		voice_cmd_audio_loopback_end(&voice);		
 		break;		
+    //lll054850 add for hide menu fens&widevoice
+    case AUDDEV_EVT_DEVICE_FENS_ENABLE:
+	  	  printk(KERN_ERR "[MyTag]auddev_cb_function: voice_cmd_audio_fens_enable()\n");
+		voice_cmd_audio_fens_enable(&voice);
+		break;
+	case AUDDEV_EVT_DEVICE_FENS_DISABLE:
+	  	  printk(KERN_ERR "[MyTag]auddev_cb_function: voice_cmd_audio_fens_disable()\n");
+		voice_cmd_audio_fens_disable(&voice);
+		break;
+	case AUDDEV_EVT_DEVICE_WIDEVOICE_ENABLE:
+	  	  printk(KERN_ERR "[MyTag]auddev_cb_function: voice_cmd_audio_widevoice_enable()\n");
+		voice_cmd_audio_widevoice_enable(&voice);
+		break;
+	case AUDDEV_EVT_DEVICE_WIDEVOICE_DISABLE:
+	  	  printk(KERN_ERR "[MyTag]auddev_cb_function: voice_cmd_audio_widevoice_enable()\n");
+		voice_cmd_audio_widevoice_disable(&voice);
+		break;
 	default:
 		MM_ERR("UNKNOWN EVENT\n");
 	}
@@ -519,6 +547,78 @@ static int voice_cmd_audio_loopback_end(struct voice_data *v)
 	return err;
 }
 
+//lll054850 add for hide menu fens&widevoice
+static int voice_cmd_audio_fens_enable(struct voice_data *v)
+{
+	struct voice_header hdr;
+	int err;
+
+	hdr.id = CMD_DEVICE_FENS_ENABLE;
+	hdr.data_len = 0;
+
+	printk(KERN_ERR "[MyTag]voice_cmd_audio_fens_enable()");
+	
+	err = dalrpc_fcn_5(VOICE_DALRPC_CMD, v->handle, &hdr,
+			 sizeof(struct voice_header));
+
+	if (err)
+		MM_ERR("Voice acquire done command failed\n");
+	return err;
+}
+
+static int voice_cmd_audio_fens_disable(struct voice_data *v)
+{
+	struct voice_header hdr;
+	int err;
+
+	hdr.id = CMD_DEVICE_FENS_DISABLE;
+	hdr.data_len = 0;
+
+	printk(KERN_ERR "[MyTag]voice_cmd_audio_fens_disable()");
+	
+	err = dalrpc_fcn_5(VOICE_DALRPC_CMD, v->handle, &hdr,
+			 sizeof(struct voice_header));
+
+	if (err)
+		MM_ERR("Voice acquire done command failed\n");
+	return err;
+}
+static int voice_cmd_audio_widevoice_enable(struct voice_data *v)
+{
+	struct voice_header hdr;
+	int err;
+
+	hdr.id = CMD_DEVICE_WIDEVOICE_ENABLE;
+	hdr.data_len = 0;
+
+	printk(KERN_ERR "[MyTag]voice_cmd_audio_widevoice_enable()");
+	
+	err = dalrpc_fcn_5(VOICE_DALRPC_CMD, v->handle, &hdr,
+			 sizeof(struct voice_header));
+
+	if (err)
+		MM_ERR("Voice acquire done command failed\n");
+	return err;
+}
+static int voice_cmd_audio_widevoice_disable(struct voice_data *v)
+{
+	struct voice_header hdr;
+	int err;
+
+	hdr.id = CMD_DEVICE_WIDEVOICE_DISABLE;
+	hdr.data_len = 0;
+
+	printk(KERN_ERR "[MyTag]voice_cmd_audio_widevoice_disable()");
+	
+	err = dalrpc_fcn_5(VOICE_DALRPC_CMD, v->handle, &hdr,
+			 sizeof(struct voice_header));
+
+	if (err)
+		MM_ERR("Voice acquire done command failed\n");
+	return err;
+}
+
+//lll054850 add for hide menu fens&widevoice
 static int voice_cmd_device_info(struct voice_data *v)
 {
 	struct voice_device cmd;
@@ -781,6 +881,11 @@ static int __init voice_init(void)
 			AUDDEV_EVT_START_VOICE |
 			AUDDEV_EVT_END_VOICE |
 			AUDDEV_EVT_DEVICE_VOL_MUTE_CHG |
+			//lll054850 add for hide menu fens&widevoice
+			AUDDEV_EVT_DEVICE_FENS_ENABLE |
+			AUDDEV_EVT_DEVICE_FENS_DISABLE |
+			AUDDEV_EVT_DEVICE_WIDEVOICE_ENABLE |
+			AUDDEV_EVT_DEVICE_WIDEVOICE_DISABLE | 
 			AUDDEV_EVT_FREQ_CHG | AUDDEV_EVT_AUDIO_LP_START | AUDDEV_EVT_AUDIO_LP_END;
 
 	MM_DBG(" to register call back \n");

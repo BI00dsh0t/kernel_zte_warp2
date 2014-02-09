@@ -159,6 +159,12 @@ struct message_header {
 #define AUDDEV_EVT_AUDIO_LP_END 	0x1000   /* audio loopback test end */
 /* 2010-10-22 AUDIO_SSY_20102022 end */
 
+//lll054850 add for hide menu fens&widevoice
+#define AUDDEV_EVT_DEVICE_FENS_ENABLE	0x1001   /* enable fens */
+#define AUDDEV_EVT_DEVICE_FENS_DISABLE	0x1002   /* disable fens */
+#define AUDDEV_EVT_DEVICE_WIDEVOICE_ENABLE 	0x1101   /* enable widevoice */
+#define AUDDEV_EVT_DEVICE_WIDEVOICE_DISABLE	0x1102  /* disable widevoice */
+
 #define AUDDEV_CLNT_VOC 		0x1	/* Vocoder clients */
 #define AUDDEV_CLNT_DEC 		0x2	/* Decoder clients */
 #define AUDDEV_CLNT_ENC 		0x3	/* Encoder clients */

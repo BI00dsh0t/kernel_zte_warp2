@@ -4,7 +4,6 @@
  /* ==========================================================================
 when         	who        	what, where, why                                        				comment tag
 --------       ----    	   -------------------------------------    		----------------------------------
-2009-10-22   feng.yuao   compass driver relative codes added to 4715.                  	ZTE_AKM8973_F.YUAO_001 
 
 ===========================================================================*/
 #ifndef AKM8973_H
@@ -69,7 +68,6 @@ when         	who        	what, where, why                                      
 #define ECS_IOCTL_APP_GET_MVFLAG	_IOR(AKMIO, 0x1A, short)	/* Get raw magnetic vector flag */
 
 
-/* ZTE_AKM8973_F.YUAO_001, 2009-10-22 */
 /* IOCTLs for pedometer */
 #define ECS_IOCTL_SET_STEP_CNT          _IOW(AKMIO, 0x20, short)
 
@@ -94,6 +92,5 @@ struct akm8973_platform_data {
 };
 
 extern char *get_akm_cal_ram(void);
-/*end , ZTE_AKM8973_F.YUAO_001, 2009-10-22 */
 #endif
 

@@ -124,6 +124,7 @@ static struct uid_stat *create_stat(uid_t uid) {
 #ifdef CONFIG_ZTE_PLATFORM
 #include <linux/module.h>
 #include <linux/mm.h>
+#include <linux/sched.h>
 enum {
 	DEBUG_TCP_SND = 1U << 0,
 	DEBUG_TCP_RCV = 1U << 1,

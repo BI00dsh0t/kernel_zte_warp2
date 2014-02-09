@@ -13,13 +13,34 @@
 #include <linux/if.h> /*For IFHWADDRLEN */
 
 #include "devices.h"
-#include "proc_comm.h"  /* For msm_proc_cmd */
+#include <mach/proc_comm.h>
 #include <linux/gpio.h>
 
 #include <linux/random.h>
 #include <linux/jiffies.h>
 
+#include <mach/pmic.h>
+
 #include <linux/proc_fs.h>
+
+//#define CONFIG_ATH_WIFI 1
+
+#define ETHER_ISBCAST(ea)	((((unsigned char *)(ea))[0] &		\
+	                          ((unsigned char *)(ea))[1] &		\
+				  ((unsigned char *)(ea))[2] &		\
+				  ((unsigned char *)(ea))[3] &		\
+				  ((unsigned char *)(ea))[4] &		\
+				  ((unsigned char *)(ea))[5]) == 0xff)
+				  
+#define ETHER_ISNULLADDR(ea)	((((unsigned char *)(ea))[0] |		\
+				  ((unsigned char *)(ea))[1] |		\
+				  ((unsigned char *)(ea))[2] |		\
+				  ((unsigned char *)(ea))[3] |		\
+				  ((unsigned char *)(ea))[4] |		\
+				  ((unsigned char *)(ea))[5]) == 0)
+
+#define ETHER_ISMCAST(ea)	((((unsigned char *)(ea))[0] & (0x1)) == 0x1)
+
 
 
 static void zte_wifi_create_random_MAC(unsigned char *ptr_mac)
@@ -83,10 +104,13 @@ static int zte_wifi_get_mac_addr(unsigned char *buf)
 			}
 		}else{
 			printk("Fail to read NV item 4678\n");
-			zte_wifi_create_random_MAC(saved_mac);
 			return -EFAULT;
 		}
 	}	
+	if(ETHER_ISBCAST(saved_mac) || ETHER_ISMCAST(saved_mac) || ETHER_ISNULLADDR(saved_mac)) {
+		zte_wifi_create_random_MAC(saved_mac);
+	}
+	
 	printk("Use MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
 				saved_mac[0], saved_mac[1], saved_mac[2],
 				saved_mac[3], saved_mac[4], saved_mac[5]);	
@@ -202,8 +226,10 @@ int zte_wifi_power(int on)
 		printk("shaohua request reg_on  success \n");
 		gpio_direction_output(ZTE_GPIO_WIFI_SHUTDOWN_N, 0);
 		mdelay(10);
+		if(on) {
 		gpio_direction_output(ZTE_GPIO_WIFI_SHUTDOWN_N, on);
 		mdelay(200);
+		}
 		gpio_free(ZTE_GPIO_WIFI_SHUTDOWN_N);
 	}
 
@@ -279,6 +305,39 @@ static int __init zte_wifi_init(void)
 #define WLAN_1V8_EN             117
 #define ZTE_PROC_COMM_CMD3_PMIC_GPIO 16
 
+#define PREALLOC_WLAN_NUMBER_OF_SECTIONS	1
+#define HIF_DMA_BUFFER_SIZE 			(32 * 1024)
+
+typedef struct wifi_mem_prealloc_struct {
+        void *mem_ptr;
+        unsigned long size;
+} wifi_mem_prealloc_t;
+
+static wifi_mem_prealloc_t wifi_mem_array[PREALLOC_WLAN_NUMBER_OF_SECTIONS] = {
+	{ NULL, (HIF_DMA_BUFFER_SIZE) },
+};
+
+static int zte_init_wifi_mem(void)
+{
+	int i;
+	for(i = 0; i < PREALLOC_WLAN_NUMBER_OF_SECTIONS; i++) {
+    		wifi_mem_array[i].mem_ptr = kmalloc(wifi_mem_array[i].size,
+                                                        GFP_KERNEL);
+                if (wifi_mem_array[i].mem_ptr == NULL)
+                        return -ENOMEM;
+        }
+        return 0;
+}
+
+static void *zte_wifi_mem_prealloc(int section, unsigned long size)
+{
+        if ((section < 0) || (section > PREALLOC_WLAN_NUMBER_OF_SECTIONS))
+                return NULL;
+        if (wifi_mem_array[section].size < size)
+                return NULL;
+        return wifi_mem_array[section].mem_ptr;
+}
+
 static int zte_wifi_power(int on)
 {
 	gpio_request(WLAN_CHIP_PWD_PIN, "WLAN_CHIP_PWD");
@@ -298,6 +357,7 @@ static int zte_wifi_power(int on)
 static struct wifi_platform_data zte_wifi_control = {
 	.set_power      = zte_wifi_power,
 	.get_mac_addr	= zte_wifi_get_mac_addr,
+	.mem_prealloc	= zte_wifi_mem_prealloc, 
 };
 
 static struct platform_device zte_wifi_device = {
@@ -320,6 +380,8 @@ static int __init zte_wifi_init(void)
 									(1 << 4)|				\
 									0x0;
 	unsigned int pmic_gpio_cmd = ZTE_PROC_COMM_CMD3_PMIC_GPIO;
+
+    zte_init_wifi_mem();
 
 	do {
 		pr_info("%s() enter\n", __func__);
@@ -364,7 +426,7 @@ static int __init zte_wifi_init(void)
 		gpio_direction_output(WLAN_CHIP_PWD_PIN, 0);
 		gpio_free(WLAN_CHIP_PWD_PIN);
 		
-		platform_device_register(&zte_wifi_device);
+		platform_device_register(&zte_wifi_device);	
 		
 		return 0;
 
@@ -419,10 +481,14 @@ char *page, char **start, off_t off, int count, int *eof, void *data)
 	return common_read_proc(page, start, off, count, eof, data, mac_formated, len);	
  
 }
-
-int wlan_init_power(void)
+//jht 20121121 add +++
+int __init wlan_init_power(void)
+//jht 20121121 add ---
 {
 	struct proc_dir_entry * d_entry;
+
+	printk("%s, enter!\n", __func__);
+
 
 	d_entry = create_proc_entry("WIFI_MAC_ADDR", 0, NULL);
 	if (d_entry)

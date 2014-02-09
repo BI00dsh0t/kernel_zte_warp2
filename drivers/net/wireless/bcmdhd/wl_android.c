@@ -1,7 +1,25 @@
 /*
  * Linux cfg80211 driver - Android related functions
  *
- * $Copyright Open Broadcom Corporation$
+ * Copyright (C) 1999-2011, Broadcom Corporation
+ * 
+ *         Unless you and Broadcom execute a separate written software license
+ * agreement governing use of this software, this software is licensed to you
+ * under the terms of the GNU General Public License version 2 (the "GPL"),
+ * available at http://www.broadcom.com/licenses/GPLv2.php, with the
+ * following added to such license:
+ * 
+ *      As a special exception, the copyright holders of this software give you
+ * permission to link this software with independent modules, and to copy and
+ * distribute the resulting executable under terms of your choice, provided that
+ * you also meet, for each linked independent module, the terms and conditions of
+ * the license of that module.  An independent module is a module which is not
+ * derived from this software.  The special exception does not apply to any
+ * modifications of the software.
+ * 
+ *      Notwithstanding the above, under no circumstances may you combine this
+ * software in any way with any other Broadcom software provided under a license
+ * other than the GPL, without Broadcom's express prior written consent.
  *
  * $Id: wl_android.c,v 1.1.4.1.2.14 2011/02/09 01:40:07 Exp $
  */
@@ -30,11 +48,13 @@
 #endif
 #endif /* CONFIG_WIFI_CONTROL_FUNC */
 
-
+//Hector 20121016 add for auto channel+++
 #define htod32(i) i
 #define htod16(i) i
 #define dtoh32(i) i
 #define dtoh16(i) i
+//Hector 20121016 add for auto channel---
+
 
 /*
  * Android private command strings, PLEASE define new private commands here
@@ -55,15 +75,22 @@
 #define CMD_BTCOEXSCAN_STOP		"BTCOEXSCAN-STOP"
 #define CMD_BTCOEXMODE			"BTCOEXMODE"
 #define CMD_SETSUSPENDOPT		"SETSUSPENDOPT"
+#define CMD_SETSUSPENDMODE		"SETSUSPENDMODE"
 #define CMD_P2P_DEV_ADDR		"P2P_DEV_ADDR"
 #define CMD_SETFWPATH			"SETFWPATH"
 #define CMD_SETBAND				"SETBAND"
 #define CMD_GETBAND				"GETBAND"
 #define CMD_COUNTRY				"COUNTRY"
 #define CMD_P2P_SET_NOA			"P2P_SET_NOA"
+#if !defined WL_ENABLE_P2P_IF
+#define CMD_P2P_GET_NOA			"P2P_GET_NOA"
+#endif
 #define CMD_P2P_SET_PS			"P2P_SET_PS"
 #define CMD_SET_AP_WPS_P2P_IE	"SET_AP_WPS_P2P_IE"
+
+//Hector 20121016 add for auto channel+++
 #define CMD_GET_AUTO_CHANNEL     "AUTOCHANNELGET"
+//Hector 20121016 add for auto channel---
 
 #ifdef PNO_SUPPORT
 #define CMD_PNOSSIDCLR_SET	"PNOSSIDCLR"
@@ -99,7 +126,7 @@ typedef struct android_wifi_priv_cmd {
  */
 void dhd_customer_gpio_wlan_ctrl(int onoff);
 uint dhd_dev_reset(struct net_device *dev, uint8 flag);
-void dhd_dev_init_ioctl(struct net_device *dev);
+int	dhd_dev_init_ioctl(struct net_device *dev);
 #ifdef WL_CFG80211
 int wl_cfg80211_get_p2p_dev_addr(struct net_device *net, struct ether_addr *p2pdev_addr);
 int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, char *command);
@@ -189,7 +216,7 @@ static int wl_android_set_suspendopt(struct net_device *dev, char *command, int 
 	ret_now = net_os_set_suspend_disable(dev, suspend_flag);
 
 	if (ret_now != suspend_flag) {
-		if (!(ret = net_os_set_suspend(dev, ret_now)))
+		if (!(ret = net_os_set_suspend(dev, ret_now, 1)))
 			DHD_INFO(("%s: Suspend Flag %d -> %d\n",
 				__FUNCTION__, ret_now, suspend_flag));
 		else
@@ -198,6 +225,25 @@ static int wl_android_set_suspendopt(struct net_device *dev, char *command, int 
 	return ret;
 }
 
+static int wl_android_set_suspendmode(struct net_device *dev, char *command, int total_len)
+{
+	int ret = 0;
+
+#if !defined(CONFIG_HAS_EARLYSUSPEND) || !defined(DHD_USE_EARLYSUSPEND)
+	int suspend_flag;
+
+	suspend_flag = *(command + strlen(CMD_SETSUSPENDMODE) + 1) - '0';
+
+	if (suspend_flag != 0)
+		suspend_flag = 1;
+
+	if (!(ret = net_os_set_suspend(dev, suspend_flag, 0)))
+		DHD_INFO(("%s: Suspend Mode %d\n",__FUNCTION__,suspend_flag));
+	else
+		DHD_ERROR(("%s: failed %d\n",__FUNCTION__,ret));
+#endif
+	return ret;
+}
 static int wl_android_get_band(struct net_device *dev, char *command, int total_len)
 {
 	uint band;
@@ -211,7 +257,7 @@ static int wl_android_get_band(struct net_device *dev, char *command, int total_
 	return bytes_written;
 }
 
-#ifdef PNO_SUPPORT
+#if defined(PNO_SUPPORT) && !defined(WL_SCHED_SCAN)
 static int wl_android_set_pno_setup(struct net_device *dev, char *command, int total_len)
 {
 	wlc_ssid_t ssids_local[MAX_PFN_LIST_COUNT];
@@ -318,7 +364,7 @@ static int wl_android_set_pno_setup(struct net_device *dev, char *command, int t
 exit_proc:
 	return res;
 }
-#endif /* PNO_SUPPORT */
+#endif /* PNO_SUPPORT && !WL_SCHED_SCAN */
 
 static int wl_android_get_p2p_dev_addr(struct net_device *ndev, char *command, int total_len)
 {
@@ -352,8 +398,10 @@ int wl_android_wifi_on(struct net_device *dev)
 		sdioh_start(NULL, 0);
 		ret = dhd_dev_reset(dev, FALSE);
 		sdioh_start(NULL, 1);
-		if (!ret)
-			dhd_dev_init_ioctl(dev);
+		if (!ret) {
+			if ((dhd_dev_init_ioctl(dev)) < 0)
+				 ret = -EFAULT;
+		}
 		g_wifi_on = 1;
 	}
 	dhd_net_if_unlock(dev);
@@ -379,7 +427,7 @@ int wl_android_wifi_off(struct net_device *dev)
 		g_wifi_on = 0;
 	}
 	dhd_net_if_unlock(dev);
-
+	bcm_mdelay(500);
 	return ret;
 }
 
@@ -399,6 +447,7 @@ static int wl_android_set_fwpath(struct net_device *net, char *command, int tota
 	return 0;
 }
 
+//Hector 20121016 add for auto channel+++
 static int last_auto_channel = 6;
 static int wl_android_auto_channel(struct net_device *dev, char *command, int total_len)
 {
@@ -418,7 +467,7 @@ static int wl_android_auto_channel(struct net_device *dev, char *command, int to
         int bytes_written = 0;
         int apsta_var = 0;
 
-        DHD_ERROR(("Enter %s\n", __func__));
+        DHD_TRACE(("Enter %s\n", __func__));
 
         channel = bcm_atoi(command);
 
@@ -532,12 +581,13 @@ fail :
         return bytes_written;
 
 }
+//Hector 20121016 add for auto channel---
 
-
-
-//ZTE_JHT_20120531 for white list+++
+//Hector 20121016 add for white list+++
 extern int wl_cfg80211_add_white_list(struct net_device *net, char *command, int num);
-//ZTE_JHT_20120531 for white list---
+//Hector 20121016 add for white list---
+
+
 int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 {
 	int ret = 0;
@@ -633,6 +683,9 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	else if (strnicmp(command, CMD_SETSUSPENDOPT, strlen(CMD_SETSUSPENDOPT)) == 0) {
 		bytes_written = wl_android_set_suspendopt(net, command, priv_cmd.total_len);
 	}
+	else if (strnicmp(command, CMD_SETSUSPENDMODE, strlen(CMD_SETSUSPENDMODE)) == 0) {
+		bytes_written = wl_android_set_suspendmode(net, command, priv_cmd.total_len);
+	}
 	else if (strnicmp(command, CMD_SETBAND, strlen(CMD_SETBAND)) == 0) {
 		uint band = *(command + strlen(CMD_SETBAND) + 1) - '0';
 		bytes_written = wldev_set_band(net, band);
@@ -643,8 +696,11 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	else if (strnicmp(command, CMD_COUNTRY, strlen(CMD_COUNTRY)) == 0) {
 		char *country_code = command + strlen(CMD_COUNTRY) + 1;
 		bytes_written = wldev_set_country(net, country_code);
+#ifdef WL_CFG80211
+		wl_update_wiphybands(NULL);
+#endif
 	}
-#ifdef PNO_SUPPORT
+#if defined(PNO_SUPPORT) && !defined(WL_SCHED_SCAN)
 	else if (strnicmp(command, CMD_PNOSSIDCLR_SET, strlen(CMD_PNOSSIDCLR_SET)) == 0) {
 		bytes_written = dhd_dev_pno_reset(net);
 	}
@@ -664,17 +720,25 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		bytes_written = wl_cfg80211_set_p2p_noa(net, command + skip,
 			priv_cmd.total_len - skip);
 	}
+#if !defined WL_ENABLE_P2P_IF
+	else if (strnicmp(command, CMD_P2P_GET_NOA, strlen(CMD_P2P_GET_NOA)) == 0) {
+		bytes_written = wl_cfg80211_get_p2p_noa(net, command, priv_cmd.total_len);
+	}
+#endif
 	else if (strnicmp(command, CMD_P2P_SET_PS, strlen(CMD_P2P_SET_PS)) == 0) {
 		int skip = strlen(CMD_P2P_SET_PS) + 1;
 		bytes_written = wl_cfg80211_set_p2p_ps(net, command + skip,
 			priv_cmd.total_len - skip);
-	} else if (strnicmp(command, CMD_GET_AUTO_CHANNEL, strlen(CMD_GET_AUTO_CHANNEL)) == 0) {
+	} 
+//Hector 20121016 add for auto channel+++
+	else if (strnicmp(command, CMD_GET_AUTO_CHANNEL, strlen(CMD_GET_AUTO_CHANNEL)) == 0) {
                 int skip = strlen(CMD_GET_AUTO_CHANNEL) + 1;
                 //block_ap_event = 1;
                 bytes_written = wl_android_auto_channel(net, command + skip,
                 priv_cmd.total_len - skip) + skip;
                 //block_ap_event = 0;
-        }
+    }
+//Hector 20121016 add for auto channel---
 #ifdef WL_CFG80211
 	else if (strnicmp(command, CMD_SET_AP_WPS_P2P_IE,
 		strlen(CMD_SET_AP_WPS_P2P_IE)) == 0) {
@@ -683,12 +747,13 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 			priv_cmd.total_len - skip, *(command + skip - 2) - '0');
 	}
 #endif /* WL_CFG80211 */
-//ZTE_JHT_20120531 for white list+++
-	else if(strnicmp(command, "add_white_list", strlen("add_white_list")) == 0) {
-		printk("shaohua got add_white_list command \n");
-		bytes_written = wl_cfg80211_add_white_list(net, priv_cmd.buf, priv_cmd.total_len);
-	}
-//ZTE_JHT_20120531 for white list---
+//Hector 20121016 add for white list+++
+		else if(strnicmp(command, "add_white_list", strlen("add_white_list")) == 0) {
+			printk("shaohua got add_white_list command \n");
+			bytes_written = wl_cfg80211_add_white_list(net, priv_cmd.buf, priv_cmd.total_len);
+		}
+//Hector 20121016 add for white list---
+
 	else {
 		DHD_ERROR(("Unknown PRIVATE command %s - ignored\n", command));
 		snprintf(command, 3, "OK");
@@ -723,12 +788,11 @@ exit:
 	return ret;
 }
 
-
 int wl_android_init(void)
 {
 	int ret = 0;
 
-	dhd_msg_level = DHD_ERROR_VAL;
+	dhd_msg_level |= DHD_ERROR_VAL;
 #ifdef ENABLE_INSMOD_NO_FW_LOAD
 	dhd_download_fw_on_driverload = FALSE;
 #endif /* ENABLE_INSMOD_NO_FW_LOAD */
@@ -950,7 +1014,7 @@ static struct platform_driver wifi_device_legacy = {
 
 static int wifi_add_dev(void)
 {
-	DHD_ERROR(("## Calling platform_driver_register\n"));
+	DHD_TRACE(("## Calling platform_driver_register\n"));
 	platform_driver_register(&wifi_device);
 	platform_driver_register(&wifi_device_legacy);
 	return 0;

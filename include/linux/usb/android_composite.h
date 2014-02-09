@@ -24,7 +24,7 @@ struct android_usb_function {
 	struct list_head	list;
 	char			*name;
 	int 			(*bind_config)(struct usb_configuration *c);
-#ifdef ZTE_PLATFORM
+#ifdef CONFIG_ZTE_PLATFORM
 	int 			(*unbind_config)(struct usb_configuration *c);
 	struct device		*dev;
 	int                     disabled;
@@ -41,7 +41,7 @@ struct android_usb_product {
 	 */
 	int num_functions;
 	char **functions;
-#ifdef ZTE_PLATFORM
+#ifdef CONFIG_ZTE_PLATFORM
 	__u16 adb_product_id;
 	int adb_num_functions;
 	char **adb_functions;

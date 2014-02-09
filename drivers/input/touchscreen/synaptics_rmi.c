@@ -110,7 +110,7 @@ static int detect_device(struct i2c_client *client)
 	if ( client == NULL )
 		return ret;
 
-	for (i=0; i<3; i++ )
+	for (i=0; i<1; i++ )
 	{
 		// 0xFF: synaptics rmi page select register
 		buf = i2c_smbus_read_byte_data(client, 0xFF);
@@ -484,6 +484,9 @@ static void synaptics_get_configid(
 	case 'A':
 		sprintf(p_sensor, "Goworld(0x%x)",ts->config_id.sensor);
 		break;
+	case 'E':
+		sprintf(p_sensor, "Junda(0x%x)",ts->config_id.sensor);
+		break;
 	default:
 		sprintf(p_sensor, "unknown(0x%x)",ts->config_id.sensor);
 		break;
@@ -719,18 +722,14 @@ static int synaptics_probe(
 
 	if ( ts->gpio_init ) {
 		ret = ts->gpio_init(1);
+		
 		if ( ret < 0 ){
 			pr_err("%s, gpio init failed! %d\n", __func__, ret);
 			goto err_power_failed;
 		}
 
-		if (ts->reset) ts->reset(0);
-		if (ts->power) ts->power(0);
-		msleep(100);
 		if (ts->power) ts->power(1);
-		msleep(10);
-		if (ts->reset) ts->reset(1);
-		msleep(100);
+		msleep(50);
 	}
 
 

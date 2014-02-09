@@ -25,6 +25,21 @@ When		Who	What,Where,Why		Comment			Tag
 #include <asm/uaccess.h>
 #include <linux/fs.h>
 
+#ifdef CONFIG_TOUCHSCREEN_RESUME_LOG
+typedef struct {
+	struct focaltech_finger_data  report_data;
+	int pointer_index;
+} log_data;
+
+#define NR_FINGERS	10
+static log_data log_report_data[NR_FINGERS*2];
+static int log_index=0;//表示当前已经记录的点动作个数
+static bool focaltech_resume_flag=true;
+static DECLARE_BITMAP(pre_fingers, NR_FINGERS);
+static DECLARE_BITMAP(pre_pre_fingers, NR_FINGERS);
+#endif
+
+
 static struct focaltech_ts_data *ftc_ts = NULL;
 
 #if defined(CONFIG_TOUCHSCREEN_FOCALTECH_FW)
@@ -35,7 +50,7 @@ int focaltech_fwupdate_deinit(struct i2c_client *client);
 #endif
 static void focaltech_get_vid(struct i2c_client *client,char *p_vid,int *p_fw_ver );
 
-#if defined(CONFIG_TOUCHSCREEN_FOCALTECH_USBNOTIFY)
+#if defined(CONFIG_FTS_USB_NOTIFY)
 static int usb_plug_status=0;
 #endif
 
@@ -58,7 +73,7 @@ struct focaltech_ts_data
 	uint16_t addr;
 	struct i2c_client *client;
 	struct input_dev *input_dev;
-	struct focaltech_finger_data finger_data[5];//ZTE_TS_XYM_20110711
+	struct focaltech_finger_data finger_data[5];
 	int touch_number;
 	int touch_event;
 	int use_irq;
@@ -69,13 +84,13 @@ struct focaltech_ts_data
 //	int gpio_irq;
 	int (*gpio_init)(int on);
 	void (*power)(int on);
-	void (*reset)(int hl);
+	void (*reset)(int on);
 	void (*irq)(int hl, bool io);
 	char  fwfile[64];
 };
 
 
-#if defined (CONFIG_TOUCHSCREEN_FOCALTECH_USBNOTIFY)
+#if defined (CONFIG_FTS_USB_NOTIFY)
 static int focaltech_ts_event(struct notifier_block *this, unsigned long event,void *ptr)
 {
 	int ret;
@@ -86,7 +101,7 @@ static int focaltech_ts_event(struct notifier_block *this, unsigned long event,v
 		//offline
 		if ( usb_plug_status != 0 ){
 	 		usb_plug_status = 0;
-			//printk("ts config change to offline status\n");
+			printk("focaltech ts config change to offline status\n");
 			i2c_smbus_write_byte_data( ftc_ts->client, 0x86,0x1);
 		}
 		break;
@@ -94,7 +109,7 @@ static int focaltech_ts_event(struct notifier_block *this, unsigned long event,v
 		//online
 		if ( usb_plug_status != 1 ){
 	 		usb_plug_status = 1;
-			//printk("ts config change to online status\n");
+			printk("focaltech ts config change to online status\n");
 			i2c_smbus_write_byte_data( ftc_ts->client, 0x86,0x3);
 		}
 		break;
@@ -126,7 +141,7 @@ int focaltech_unregister_ts_notifier(struct notifier_block *nb)
 }
 EXPORT_SYMBOL_GPL(focaltech_unregister_ts_notifier);
 
-int focaltech_ts_notifier_call_chain(unsigned long val)
+int Ft5x0x_ts_notifier_call_chain(unsigned long val)
 {
 	return (blocking_notifier_call_chain(&ts_chain_head, val, NULL)
 			== NOTIFY_BAD) ? -EINVAL : 0;
@@ -140,7 +155,7 @@ static bool  detect_device(struct i2c_client *client)
 	int retry;//ret;
 	signed int buf;
 	
-	retry = 3;
+	retry = 1;
 	while (retry-- > 0)
 	{
 		buf = i2c_smbus_read_byte_data(client, FT5X0X_REG_FIRMID);
@@ -267,6 +282,9 @@ static void focaltech_get_vid(
 	case 0x51:// 欧菲光ofilm
 		sprintf( p_vid, "ofilm(0x%x)", buf1  );
 		break;
+	case 0x53:// 牧东
+		sprintf( p_vid, "mudong(0x%x)", buf1  );
+		break;
 	case 0x55:// 莱宝
 		sprintf( p_vid, "laibao(0x%x)", buf1  );
 		break;
@@ -298,6 +316,67 @@ static void focaltech_get_vid(
 	pr_info("vendor: %s, fw =0x%x \n", p_vid, *p_fw_ver);
 
 }
+
+#ifdef CONFIG_TOUCHSCREEN_RESUME_LOG
+static void focaltech_log1(int i, struct focaltech_ts_data *ts)//collect data
+{	
+	memcpy(&(log_report_data[log_index].report_data), &ts->finger_data[i], sizeof(struct focaltech_finger_data));
+	log_report_data[log_index].pointer_index = i;
+	log_index++;	
+}
+
+static void focaltech_log2(void)//log data
+{	
+	int index_max;
+	//struct timespec ts1, ts2, ts;
+	//ktime_get_ts(&ts1);
+	index_max = log_index;
+	if(log_index>=10) 
+	{
+		while(log_index!=0)
+		{
+			printk("pointer %d (x=0x%x, y=0x%x, z=0x%x)\n", 
+				log_report_data[index_max-log_index].pointer_index,
+				log_report_data[index_max-log_index].report_data.x, 
+				log_report_data[index_max-log_index].report_data.y, 
+				log_report_data[index_max-log_index].report_data.z
+				);
+			log_index--;			
+		}
+		//ktime_get_ts(&ts2);
+		//ts = timespec_sub(ts2, ts1);
+		//printk("xym : %d data, %ld ns------\n", index_max, ts.tv_nsec);	
+		focaltech_resume_flag = false;
+	}
+}
+
+static void focaltech_log3(void)//suspend log
+{	
+	int index_max;
+	//struct timespec ts1, ts2, ts;
+	//ktime_get_ts(&ts1);
+	index_max = log_index;
+	{
+		while(log_index!=0)
+		{
+			//printk("pointer %d (x=%d, y=%d, z=%d)\n", 
+			printk("pointer %d (x=0x%x, y=0x%x, z=0x%x)\n", 
+				log_report_data[index_max-log_index].pointer_index,
+				log_report_data[index_max-log_index].report_data.x, 
+				log_report_data[index_max-log_index].report_data.y, 
+				log_report_data[index_max-log_index].report_data.z
+				);
+			log_index--;			
+		}
+		//ktime_get_ts(&ts2);
+		//ts = timespec_sub(ts2, ts1);
+		//printk("xym : %d data, %ld ns------\n", index_max, ts.tv_nsec);	
+		focaltech_resume_flag = false;
+	}
+}
+
+#endif
+
 
 
 static void focaltech_ts_work_func(struct work_struct *work)
@@ -335,18 +414,49 @@ static void focaltech_ts_work_func(struct work_struct *work)
 		}
 		for (i = 0; i< ts->touch_event; i++)
 		{
+			/*ergate-008*/
+			if(ts->finger_data[i].z != 0)
+			{
+			input_report_key(ts->input_dev, BTN_TOUCH, 1);
 			input_report_abs(ts->input_dev, ABS_MT_TRACKING_ID, ts->finger_data[i].touch_id);
 			input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, ts->finger_data[i].z);
 			input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR, ts->finger_data[i].w );
 			input_report_abs(ts->input_dev, ABS_MT_POSITION_X, ts->finger_data[i].x );
 			input_report_abs(ts->input_dev, ABS_MT_POSITION_Y, ts->finger_data[i].y );
 			input_report_abs(ts->input_dev, ABS_MT_PRESSURE, ts->finger_data[i].z);		
+			}
 			input_mt_sync(ts->input_dev);
 			//printk("%s: finger=%d, z=%d, event_flag=%d, touch_id=%d\n", __func__, i, 
 			//ts->finger_data[i].z, ts->finger_data[i].event_flag,ts->finger_data[i].touch_id);
+#ifdef CONFIG_TOUCHSCREEN_RESUME_LOG
+			if(focaltech_resume_flag )
+			{
+				memcpy(pre_pre_fingers, pre_fingers, sizeof(*pre_fingers));			
+				if(ts->finger_data[i].z == 0)
+				{
+					__clear_bit(i, pre_fingers);					
+				}
+				else
+				{
+					__set_bit(i, pre_fingers);				
+				}
+				
+				if(test_bit(i, pre_fingers) != test_bit(i, pre_pre_fingers))
+				{
+					focaltech_log1(i, ts);
+				}
+			}
+#endif		
 		}
 
 		input_sync(ts->input_dev);
+
+#ifdef CONFIG_TOUCHSCREEN_RESUME_LOG
+			if(focaltech_resume_flag)
+				focaltech_log2();
+#endif
+
+
 	}
 
 	if (ts->use_irq)
@@ -379,12 +489,18 @@ static int focaltech_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 
 	i2c_smbus_write_byte_data(client, FT5X0X_REG_PMODE, PMODE_HIBERNATE);
 
+#ifdef CONFIG_TOUCHSCREEN_RESUME_LOG
+	if(focaltech_resume_flag)
+		focaltech_log3();
+#endif
+	
 	return 0;
 }
 
 static int focaltech_ts_resume(struct i2c_client *client)
 {
-	uint8_t buf,retry=0;
+	uint8_t retry=0;
+	s32 ret=0;
 	struct focaltech_ts_data *ts = i2c_get_clientdata(client);
 
 focaltech_resume_start:	
@@ -396,15 +512,15 @@ focaltech_resume_start:
 	}
 
 	//fix bug: fts failed set reg when usb plug in under suspend mode
-#if defined(CONFIG_TOUCHSCREEN_FOCALTECH_USBNOTIFY)
+#if defined(CONFIG_FTS_USB_NOTIFY)
 	if(usb_plug_status==1)
 		i2c_smbus_write_byte_data( ftc_ts->client, 0x86,0x3);
 	else 
 		i2c_smbus_write_byte_data( ftc_ts->client, 0x86,0x1);
 #endif
 
-	buf = i2c_smbus_read_byte_data(client, FT5X0X_REG_FIRMID );
-	if ( !buf )
+	ret = i2c_smbus_read_byte_data(client, FT5X0X_REG_FIRMID );
+	if ( 0>ret )
 	{
 		printk("%s: Fts FW ID read Error: retry=0x%X\n", __func__, retry);
 		if ( ++retry < 3 ) goto focaltech_resume_start;
@@ -413,6 +529,10 @@ focaltech_resume_start:
 	//release_all_fingers(ts);
 	enable_irq(client->irq);
 	
+#ifdef CONFIG_TOUCHSCREEN_RESUME_LOG
+	focaltech_resume_flag=true;
+#endif
+
 	return 0;
 }
 
@@ -440,10 +560,10 @@ static int focaltech_ts_probe(
 	struct focaltech_ts_platform_data *pdata;
 	int ret = 0;
 	struct proc_dir_entry *dir, *refresh;
-	int xres, yres;	// LCD x,y resolution
+	int xres=0, yres=0;	// LCD x,y resolution
 
 
-	printk("%s enter\n",__func__);
+	printk("xiongyiming %s enter\n",__func__);
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C))
 	{
@@ -461,11 +581,10 @@ static int focaltech_ts_probe(
 
 	pdata = client->dev.platform_data;
 	if (pdata){
-		//ts->gpio_irq = pdata->gpio_irq;
 		ts->gpio_init = pdata->gpio_init;
 		ts->power	= pdata->power;
 		ts->reset	= pdata->reset;
-		ts->irq 	= pdata->irq;
+		ts->irq		= pdata->irq;
 		memcpy(ts->fwfile,pdata->fwfile,sizeof(pdata->fwfile));
 	}
 
@@ -476,9 +595,8 @@ static int focaltech_ts_probe(
 			goto err_power_failed;
 		}
 
-		if (ts->reset) ts->reset(0);
-		if (ts->power) ts->power(1); msleep(5);		
-		if (ts->reset) ts->reset(1); msleep(300);
+		if (ts->power) ts->power(1);
+		msleep(50);
 	}
 
 	if ( !detect_device(client) )
@@ -526,6 +644,8 @@ static int focaltech_ts_probe(
 	set_bit(ABS_MT_WIDTH_MAJOR, ts->input_dev->absbit);
 	set_bit(ABS_MT_ORIENTATION, ts->input_dev->absbit);
 	set_bit(ABS_MT_PRESSURE, ts->input_dev->absbit);
+	/*ergate-008*/
+	set_bit(BTN_TOUCH, ts->input_dev->keybit);
 	
 	input_set_abs_params(ts->input_dev, ABS_MT_TRACKING_ID, 0, 10, 0, 0);
 	input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0, 127, 0, 0);
@@ -575,7 +695,7 @@ static int focaltech_ts_probe(
 		refresh->write_proc = proc_write_val;
 	}
 
-#if defined(CONFIG_TOUCHSCREEN_FOCALTECH_USBNOTIFY)
+#if defined(CONFIG_FTS_USB_NOTIFY)
 	focaltech_register_ts_notifier(&ts_notifier);
 #endif
 
@@ -587,6 +707,11 @@ static int focaltech_ts_probe(
 
 	pr_info("%s: Start touchscreen %s in %s mode\n", 
 		__func__, ts->input_dev->name, ts->use_irq ? "interrupt" : "polling");
+
+#ifdef CONFIG_TOUCHSCREEN_RESUME_LOG
+	bitmap_zero(pre_fingers, NR_FINGERS);
+	bitmap_zero(pre_pre_fingers, NR_FINGERS);
+#endif
 	return 0;
 
 err_input_request_irq_failed:
@@ -651,6 +776,7 @@ static struct i2c_driver focaltech_ts_driver = {
 
 static int __devinit focaltech_ts_init(void)
 {
+	printk("xiongyiming %s enter\n",__func__);
 	return i2c_add_driver(&focaltech_ts_driver);
 }
 

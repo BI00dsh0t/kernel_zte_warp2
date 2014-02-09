@@ -448,7 +448,7 @@ static E_UPGRADE_ERR_TYPE  focaltech_ctpm_write_fw(struct i2c_client *client,foc
         byte_read(client,reg_val,2);
         i++;
         printk("Step 3: CTPM ID, ID1 = 0x%x, ID2 = 0x%x\n",reg_val[0],reg_val[1]);
-    }while(reg_val[0] != 0x79 || reg_val[1] != 0x03);
+    }while(reg_val[0] != 0x79 || reg_val[1] != 0x07);
 
      /*********Step 4:erase app*******************************/
     cmd_write(client,0x61,0x00,0x00,0x00,1);
@@ -594,8 +594,6 @@ int focaltech_ctpm_update_fw(struct i2c_client *client,focaltech_BYTE* pbt_buf, 
 	printk("%s: self calibration begin\n", __func__);
 	focaltech_ctpm_selfcal(client);
 
-	//	ret = focaltech_i2c_read(update_client, FT5X0X_REG_FIRMID, &fwVer,1) ;//ZTE_TS_XYM_20110830
-	//	printk("%s: New Fts FW ID read ID = 0x%x,ret = 0x%x\n", __FUNCTION__, fwVer, ret);//ZTE_TS_XYM_20110830
 
 	return 0;
 }

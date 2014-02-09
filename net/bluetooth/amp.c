@@ -11,6 +11,7 @@
    GNU General Public License for more details.
 */
 
+#include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -374,13 +375,11 @@ static void send_a2mp_change_notify(void)
 {
 	struct amp_mgr *mgr;
 
-	read_lock(&amp_mgr_list_lock);
 	list_for_each_entry(mgr, &amp_mgr_list, list) {
 		if (mgr->discovered)
 			send_a2mp_cl(mgr, next_ident(mgr),
 					A2MP_CHANGE_NOTIFY, 0, NULL);
 	}
-	read_unlock(&amp_mgr_list_lock);
 }
 
 static inline int discover_req(struct amp_mgr *mgr, struct sk_buff *skb)

@@ -27,7 +27,7 @@
 #define fb_width(fb)	((fb)->var.xres)
 #define fb_height(fb)	((fb)->var.yres)
 #define fb_size(fb)	((fb)->var.xres * (fb)->var.yres * 2)
-
+/*
 static void memset16(void *_ptr, unsigned short val, unsigned count)
 {
 	unsigned short *ptr = _ptr;
@@ -35,9 +35,10 @@ static void memset16(void *_ptr, unsigned short val, unsigned count)
 	while (count--)
 		*ptr++ = val;
 }
+*/
 #ifndef CONFIG_ZTE_PLATFORM
 /* 565RLE image format: [count(2 bytes), rle(2 bytes)] */
-int load_565rle_image(char *filename)
+int load_565rle_image(char *filename, bool bf_supported)
 {
 	struct fb_info *info;
 	int fd, count, err = 0;
@@ -76,6 +77,12 @@ int load_565rle_image(char *filename)
 
 	max = fb_width(info) * fb_height(info);
 	ptr = data;
+	if (bf_supported && (info->node == 1 || info->node == 2)) {
+		err = -EPERM;
+		pr_err("%s:%d no info->creen_base on fb%d!\n",
+		       __func__, __LINE__, info->node);
+		goto err_logo_free_data;
+	}
 	bits = (unsigned short *)(info->screen_base);
 	while (count > 3) {
 		unsigned n = ptr[0];
@@ -102,7 +109,7 @@ int load_565rle_image(char *filename)
 	struct fb_info *info;
 	int fd, err = 0;
 	unsigned count, max;
-	unsigned short *data, *bits, *ptr;
+	char *data, *bits, *ptr;
 	printk("LUYA!!!!1 load_565rle_image\n");
 
 	info = registered_fb[0];
@@ -119,8 +126,10 @@ int load_565rle_image(char *filename)
 			__func__, filename);
 		return -ENOENT;
 	}
-	max = fb_width(info) * fb_height(info)*2;
+	max = fb_width(info) * fb_height(info)*4;
 	printk("LUYA!!!!max=%d\n",max);
+
+
 	count = (unsigned)sys_lseek(fd, (off_t)0, 2);
 	printk("LUYA!!!!count=%d\n",count);
 	
@@ -129,7 +138,9 @@ int load_565rle_image(char *filename)
 		err = -EIO;
 		goto err_logo_close_file;
 	}
+
 	sys_lseek(fd, (off_t)0, 0);
+
 	data = kmalloc(count, GFP_KERNEL);
 	if (!data) {
 		printk(KERN_WARNING "%s: Can not alloc data\n", __func__);
@@ -139,20 +150,30 @@ int load_565rle_image(char *filename)
 	if ((unsigned)sys_read(fd, (char *)data, count) != count) {
 		err = -EIO;
 		goto err_logo_free_data;
-	}
-	ptr = data+27;
-	bits = (unsigned short *)(info->screen_base);
+	}  
+	ptr = data+54;
+	bits = (char *)(info->screen_base);
+
+	//memcpy((void *)info->screen_base,(void *)(data+27),480*800*4);
+
 	while (max > 0) {
 //		unsigned n = ptr[0];
 //		if (n > max)
 //			break;
-		memset16(bits, ptr[0], 1 << 1);
-		bits += 1;
-		max -= 1;
-		ptr += 1;
+		//memset16(bits, ptr[0], 1 << 1);
+		//memset16(bits+1, ptr[3], 1 << 1);
+		//memset16(bits+2, ptr[2], 1 << 1);
+		//memset16(bits+3, ptr[1], 1 << 1);
+		bits[0] = ptr[2];
+		bits[1] = ptr[1];
+		bits[2] = ptr[0];
+		bits[3] = ptr[3];
+		bits += 4;
+		max -= 4;  
+		ptr += 4;
+		
 //		count -= 1;
 	}
-
 err_logo_free_data:
 	kfree(data);
 err_logo_close_file:

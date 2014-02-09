@@ -23,7 +23,6 @@
 #include <linux/proc_fs.h>
 #endif
 #include "power.h"
-//20100519 ZTE_WAKELOCK_LYJ_001 
 #include <linux/moduleparam.h>
 
 enum {
@@ -190,9 +189,7 @@ static ssize_t suspend_sync_store(struct device *dev,
 static DEVICE_ATTR(suspend_sync, S_IRUGO, suspend_sync_show, suspend_sync_store);
 
 #ifdef CONFIG_ZTE_SUSPEND_WAKEUP_MONITOR
-/* 2010.0114 begin*/
 #define WAKE_LOCK_RECORD_NR (10)
-/*ZTE_HYJ_PM_20100506 begin*/
 #define RECORD_SIZE 400 
 char active_wake_lock_buf[WAKE_LOCK_RECORD_NR][RECORD_SIZE];
 
@@ -214,9 +211,7 @@ static ssize_t active_wake_lock_show(struct device *devp, struct device_attribut
 	
 	return used_size;
 }
-/*ZTE_HYJ_PM_20100506 end*/
 static DEVICE_ATTR(active_wakelock, S_IRUGO, active_wake_lock_show, NULL);
-/*ZTE_HYJ_WAKELOCK_TOOL 2010.0114 end*/
 #endif
 #endif
 
@@ -465,11 +460,9 @@ long has_wake_lock(int type)
 }
 
 #ifdef CONFIG_ZTE_SUSPEND_WAKEUP_MONITOR
-/*ZTE_HYJ_WAKELOCK_TOOL 2010.0114 begin*/
 static void suspend_exception_handle(unsigned long data);
 static DEFINE_TIMER(suspend_exception_timer, suspend_exception_handle, 0, 0);
-static void dump_wake_locks(void);//ZTE_ZHENGCHAO_PM_20100406_01
-/*ZTE_HYJ_PM_20100506 begin*/
+static void dump_wake_locks(void);
 static void suspend_exception_handle(unsigned long data)
 {
 	unsigned long irqflags;
@@ -482,7 +475,7 @@ static void suspend_exception_handle(unsigned long data)
 	struct timespec ts;
 	struct rtc_time tm;
 
-	dump_wake_locks();//ZTE_ZHENGCHAO_PM_20100406_01
+	dump_wake_locks();
 	getnstimeofday(&ts);
 	rtc_time_to_tm(ts.tv_sec, &tm);
 	
@@ -516,16 +509,12 @@ static void suspend_exception_handle(unsigned long data)
 	
 handle_out:	
 	record_index = (record_index + 1) % WAKE_LOCK_RECORD_NR;
-	/*ZTE_HYJ_PM_20100419_01 15Hz -> 5*60HZ*/
 	mod_timer(&suspend_exception_timer, jiffies + 5*60*HZ);
 	
 	spin_unlock_irqrestore(&list_lock, irqflags);
 }
-/*ZTE_HYJ_WAKELOCK_TOOL 2010.0114 end*/
-/*ZTE_HYJ_PM_20100506 end*/
 #endif
 #ifdef CONFIG_ZTE_PLATFORM
-//20100519 ZTE_WAKELOCK_LYJ_001 
 static int unknown_wakeup_timeout = 500;
 extern int cpufreq_set_min_freq(int flag);
 module_param_named(unknown_wakeup_timeout, unknown_wakeup_timeout, int, S_IRUGO | S_IWUSR | S_IWGRP);
@@ -618,10 +607,8 @@ static void suspend(struct work_struct *work)
 	cpufreq_set_min_freq(1);
 #endif
 #ifdef	CONFIG_ZTE_SUSPEND_WAKEUP_MONITOR
-	/*ZTE_HYJ_WAKELOCK_TOOL 2010.0114 begin*/
 	if(timer_pending(&suspend_exception_timer))
 		del_timer(&suspend_exception_timer);
-/*ZTE_HYJ_WAKELOCK_TOOL 2010.0114 end*/	
 #endif
 	entry_event_num = current_event_num;
 	suspend_sys_sync_queue();
@@ -654,7 +641,6 @@ static void suspend(struct work_struct *work)
 	if (current_event_num == entry_event_num) {
 		if (debug_mask & DEBUG_SUSPEND)
 			pr_info("suspend: pm_suspend returned with no event\n");
-//20100519 ZTE_WAKELOCK_LYJ_001 
 #ifdef CONFIG_ZTE_PLATFORM
         wake_lock_timeout(&unknown_wakeup, msecs_to_jiffies(unknown_wakeup_timeout));
 #else
@@ -705,7 +691,7 @@ static int power_suspend_late(struct device *dev)
 	wait_for_wakeup = !ret;
 #endif
 	if (debug_mask & DEBUG_SUSPEND)
-	{		// #ifdef CONFIG_ZTE_PLATFORM
+	{		
 		pr_info("power_suspend_late return %d\n", ret);
 		if (ret!=0)
 			dump_wake_locks();
@@ -836,13 +822,11 @@ static void wake_lock_internal(
 	}
 	if (type == WAKE_LOCK_SUSPEND) {
 #ifdef	CONFIG_ZTE_SUSPEND_WAKEUP_MONITOR			
-	/*ZTE_HYJ_WAKELOCK_TOOL 2010.0114 begin*/	
 		if (lock == &main_wake_lock) {
-			current_event_num++;
+		current_event_num++;
 			if(timer_pending(&suspend_exception_timer))
 				del_timer(&suspend_exception_timer);
 		}
-	/*ZTE_HYJ_WAKELOCK_TOOL 2010.0114 end*/		
 #endif		
 #ifdef CONFIG_WAKELOCK_STAT
 		if (lock == &main_wake_lock)
@@ -898,10 +882,8 @@ void wake_unlock(struct wake_lock *lock)
 	list_del(&lock->link);
 	list_add(&lock->link, &inactive_locks);
 #ifdef	CONFIG_ZTE_SUSPEND_WAKEUP_MONITOR	
-/*ZTE_HYJ_WAKELOCK_TOOL 2010.0114 begin*/
 	if (lock == &main_wake_lock) 
-		mod_timer(&suspend_exception_timer,jiffies + 5*60*HZ); /*ZTE_HYJ_PM_20100419_01 15Hz -> 5*60HZ*/
-/*ZTE_HYJ_WAKELOCK_TOOL 2010.0114 end*/	
+		mod_timer(&suspend_exception_timer,jiffies + 5*60*HZ);
 #endif
 	if (type == WAKE_LOCK_SUSPEND) {
 		long has_lock = has_wake_lock_locked(type);
@@ -1004,13 +986,11 @@ static int __init wakelocks_init(void)
 		goto err_suspend_work_queue;
 	}
 #ifdef CONFIG_ZTE_SUSPEND_WAKEUP_MONITOR
-	/*ZTE_HYJ_WAKELOCK_TOOL 2010.0114 begin*/
 	ret = device_create_file(&power_device.dev,&dev_attr_active_wakelock);
 	if (ret) {
 		pr_err("wakelocks_init: device_create_file failed\n");
 		goto err_suspend_work_queue;
 	}
-	/*ZTE_HYJ_WAKELOCK_TOOL 2010.0114 begin*/
 #endif	
 
 #ifdef CONFIG_WAKELOCK_STAT

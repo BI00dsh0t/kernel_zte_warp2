@@ -2,9 +2,6 @@
 /* ========================================================================================
 when            who       what, where, why                         		comment tag
 --------     ----       -------------------------------------    --------------------------
-2010-12-28	 zfj		 add the configuratio for P855A10			ZTE_TS_ZFJ_20101228
-2010-12-13   wly         v9＋默认竖屏                               ZTE_WLY_CRDB00586327
-2010-11-24   wly         解决手掌在屏上，睡眠唤醒后数据乱报问题     ZTE_WLY_CRDB00577718
 ========================================================================================*/
 
 #include <linux/module.h>
@@ -279,7 +276,7 @@ struct atmel_i2c_platform_data atmel_data = {
 	.display_width = 1024,  /* display width in pixel */
 	.display_height = 1024, /* display height in pixel */
 
-#elif defined(CONFIG_MACH_WARP2)
+#elif defined(CONFIG_MACH_WARP2) || defined (CONFIG_MACH_RADIANT)
 	.version = 0x16,
 	.source = 1,
 	.abs_x_min = 0,

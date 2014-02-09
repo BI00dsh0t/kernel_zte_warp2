@@ -21,22 +21,7 @@
 ========================================================================
 when         who           what, where, why                                                 comment tag
 --------     ----          -------------------------------------    ------------------------------------
-2011-04-19   luya		modify for BKL abnormal when wakeup	CRDB00639193	ZTE_LCD_LUYA_20110419_001
-2010-11-04   lkej 	   modify  the fuction lcdc_panel_on() for bootup image	ZTE_LCD_LKEJ_20101104_001					
-2010-06-11   lht		   project mode display panel info         	                         ZTE_LCD_LHT_20100611_001
-2010-06-09   lht		   change max bkl level to 25           	                         ZTE_LCD_LHT_20100609_001
-2010-05-21   lht		   early suspand current adjust           	                         ZTE_LCD_LHT_20100521_001
-2010-05-19   lht		   sleep current adjust           			                         ZTE_LCD_LHT_20100519_001
-2010-03-19   liuhaitao     for lcd dithering while shake 			                  ZTE_LCD_LHT_20100319_001
-2010-03-01   liuhaitao     for sleep/wakeup bkl black
-2010-01-26   luya		   fix white-screen(permanent) when wakeup	            ZTE_LCD_LUYA_20100126_001
-2010-01-14   luya		   fix white-screen when wakeup(cause:bkl 
-						   on before lcd)							            ZTE_LCD_LUYA_20100114_001
-2009-12-18   lixiongwei    fix the lcd wave problem                                        ZTE_BACKLIGHT_LXW_001
-2009-11-28   hp            fix transient white screen                                          ZTE_BACKLIGHT_HP_001
-2009-11-27   weilanying    ajust backlight                                                     ZTE_BACKLIGHT_WLY_004 
-2009-10-30   weilanying    backlight go to dim                                               ZTE_BACKLIGHT_WLY_002 
-2009-10-31   weilanying    backlight set 32 class                                            ZTE_BACKLIGHT_WLY_003
+
 =======================================================
 */
 
@@ -52,7 +37,7 @@ when         who           what, where, why                                     
 #define lcd_bl_max   lcd_bl_level-1
 #define lcd_bl_min   0
 
-extern u32 LcdPanleID;   //ZTE_LCD_LHT_20100611_001
+extern u32 LcdPanleID;
 
 //static DEFINE_SPINLOCK(tps61061_lock);
 
@@ -76,7 +61,7 @@ static LCD_PANEL_TYPE g_lcd_panel_type = LCD_PANEL_NONE;
 
 
 
-static bool onewiremode = TRUE;		///ZTE_LCD_LUYA_20110419_001
+static bool onewiremode = TRUE;
 static struct msm_panel_common_pdata * lcdc_tft_pdata;
 static void gpio_lcd_lead_emuspi_write_one_index(unsigned short addr);
 static void gpio_lcd_lead_emuspi_write_one_data(unsigned short data);
@@ -184,7 +169,7 @@ static void lcdc_set_bl(struct msm_fb_data_type *mfd)
 
     if(!mfd->panel_power_on)
 	{
-    	gpio_direction_output(GPIO_LCD_BL_PWM_OUT, 0);			///ZTE_LCD_LUYA_20100201_001
+    	gpio_direction_output(GPIO_LCD_BL_PWM_OUT, 0);
 	    return;
     }
 
@@ -197,7 +182,6 @@ static void lcdc_set_bl(struct msm_fb_data_type *mfd)
         current_lel = 32;
     }
 
-    /*ZTE_BACKLIGHT_WLY_005,@2009-11-28, set backlight as 32 levels, end*/
     local_irq_save(flags);
     if(current_lel==0)
     {
@@ -863,14 +847,12 @@ static void spi_init(void)
 static int lcdc_panel_on(struct platform_device *pdev)
 {
 
-	spi_init();   //ZTE_LCD_LHT_20100519_001
-///ZTE_LCD_LUYA_20100126_001
+	spi_init();
+
 	if(himax_panel_initialized==1) 
 	{
 		himax_panel_initialized = 0;
-		//ZTE_LCD_LKEJ_20101104_001,start
-		//lcdc_himax_init();   
-		//ZTE_LCD_LKEJ_20101104_001,end
+		
 	}
 	else 
 	{
@@ -913,7 +895,6 @@ static int lcdc_panel_off(struct platform_device *pdev)
 	}
 	
 	gpio_direction_output(panel_reset, 0);
-	//ZTE_LCD_LHT_20100521_001
 	gpio_direction_output(spi_sclk, 0);
 	gpio_direction_output(spi_sdi, 0);
 	gpio_direction_output(spi_sdo, 0);
@@ -924,9 +905,9 @@ static int lcdc_panel_off(struct platform_device *pdev)
 void lcd_panel_init(void)
 {
 	gpio_direction_output(panel_reset, 1);
-	msleep(10);						////ZTE_LCD_LUYA_20100629_001
+	msleep(10);
 	gpio_direction_output(panel_reset, 0);
-	msleep(20);						////ZTE_LCD_LUYA_20100629_001
+	msleep(20);
 	gpio_direction_output(panel_reset, 1);
 	msleep(20);	
 	switch(g_lcd_panel_type)
@@ -1249,9 +1230,7 @@ static void SPI_Stop(void)
 }
 
 static struct msm_fb_panel_data lcdc_tft_panel_data = {
-    /* ZTE_BACKLIGHT_WLY_004 @2009-11-27 ajust backlight, begin */
-    .panel_info = {.bl_max = 27},      //ZTE_LCD_LHT_20100609_001
-    /* ZTE_BACKLIGHT_WLY_004 @2009-11-27 ajust backlight, begin */
+    .panel_info = {.bl_max = 27},
 	.on = lcdc_panel_on,
 	.off = lcdc_panel_off,
        .set_backlight = lcdc_set_bl,

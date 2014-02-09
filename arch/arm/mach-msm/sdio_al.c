@@ -565,13 +565,13 @@ static int sdio_al_debugfs_init(void)
 		return -ENOENT;
 
 	sdio_al->debug.sdio_al_debug_lpm_on = debugfs_create_u8("debug_lpm_on",
-					S_IRUGO | S_IWUSR, 
+					S_IRUGO | S_IWUSR,
 					sdio_al->debug.sdio_al_debug_root,
 					&sdio_al->debug.debug_lpm_on);
 
 	sdio_al->debug.sdio_al_debug_data_on = debugfs_create_u8(
 					"debug_data_on",
-					S_IRUGO | S_IWUSR, 
+					S_IRUGO | S_IWUSR,
 					sdio_al->debug.sdio_al_debug_root,
 					&sdio_al->debug.debug_data_on);
 
@@ -583,7 +583,7 @@ static int sdio_al_debugfs_init(void)
 
 	sdio_al->debug.sdio_al_debug_info = debugfs_create_file(
 					"sdio_debug_info",
-					S_IRUGO | S_IWUSR, 
+					S_IRUGO | S_IWUSR,
 					sdio_al->debug.sdio_al_debug_root,
 					NULL,
 					&debug_info_ops);

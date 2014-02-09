@@ -15,13 +15,7 @@
 /* ========================================================================================
 when            who       what, where, why                         		comment tag
 --------     ----       -------------------------------------    --------------------------
-2011-08-30   hjy        add the TOUCH_LONG_SLIDE function    TOUCH_LONG_SLIDE
-2011-04-25   zfj         add P732A driver code                      ZTE_TS_ZFJ_20110425
-2011-02-23   hjy         ATMEL 140 用在P727A20上       ZTE_HJY_CRDB00000000
-2010-12-14   wly         v9默认竖屏                                 ZTE_WLY_CRDB00586327
-2010-12-13   wly         v9＋默认竖屏                               ZTE_WLY_CRDB00586327
-2010-11-24   wly         解决手掌在屏上，睡眠唤醒后数据乱报问题     ZTE_WLY_CRDB00577718
-2010-10-25   wly         update report data format                  ZTE_WLY_CRDB00517999
+
 ========================================================================================*/
 #include <linux/module.h>
 #include <linux/input.h>
@@ -66,11 +60,11 @@ static uint8_t temp_flag2=0;
 #endif
 
 static struct atmel_ts_data *atmel_ts;
-
+int is_new_fw=0;
 #define TCH_CALIBRATION
 #ifdef TCH_CALIBRATION
 static int8_t temp_t9_7=0;
-#if defined(CONFIG_MACH_BLADE2)
+#if defined(CONFIG_MACH_AVIVA)
 	//#if defined(CONFIG_TOUCHSCREEN_MXT224_P736V)
 	#define temp_t9_7_def1 60
 	//#endif
@@ -140,8 +134,8 @@ struct atmel_ts_data {
 	
 	int (*gpio_init)(int on);
 	void (*power)(int on);
-	void (*reset)(int hl);
-	void (*irq)(int hl,bool io);
+	void (*reset)(int on);
+	void (*irq)(int wake, bool flag);
 	char  fwfile[64];	// firmware file name
 };
 
@@ -302,7 +296,7 @@ static void release_all_fingers(struct atmel_ts_data*ts)
 #endif
 
 
-#if defined CONFIG_TS_NOTIFIER
+#if defined CONFIG_ATMEL_TS_USB_NOTIFY
 static int usb_status=0;
 
 static int ts_event(struct notifier_block *this, unsigned long event,
@@ -310,6 +304,7 @@ static int ts_event(struct notifier_block *this, unsigned long event,
 {
 	int ret;
 
+	printk("enter ts_event, event=%d\n", (int)event);
 	switch(event)
 		{
 		case 0:
@@ -322,6 +317,7 @@ static int ts_event(struct notifier_block *this, unsigned long event,
 		 			get_object_address(atmel_ts, TOUCH_MULTITOUCHSCREEN_T9) + 31,
 		 			atmel_ts->config_setting[0].config_T9[31]);
 		 		}				
+				if(is_new_fw==0){
 				#if defined(TCH_CALIBRATION)
 				//在拔出USB的时候，也是缓慢的漂回默认值，避免拔USB的时候出问题
 				//P736V在桌子上的时候不能将门限提到70 所以只能先直接降低一些
@@ -329,6 +325,12 @@ static int ts_event(struct notifier_block *this, unsigned long event,
 				temp_t9_7=atmel_ts->config_setting[0].config_T9_charge[0];					
 				if(temp_t9_7>=temp_t9_7_def1)
 					temp_t9_7=temp_t9_7_def1;
+		 		i2c_atmel_write_byte_data(atmel_ts->client,//xym 20120303
+		 			get_object_address(atmel_ts, TOUCH_MULTITOUCHSCREEN_T9) + 7,
+		 			temp_t9_7_def1);
+
+
+				
 				//在这里不需要重新算手指的抬起，只要更新了时间就可以了
         		//temp_release=0;
         		atmel_ts->timestamp1=jiffies;
@@ -337,6 +339,11 @@ static int ts_event(struct notifier_block *this, unsigned long event,
 		 			get_object_address(atmel_ts, TOUCH_MULTITOUCHSCREEN_T9) + 7,
 		 			atmel_ts->config_setting[0].config_T9[7]);
 				#endif
+					}else{
+		 		i2c_atmel_write_byte_data(atmel_ts->client,
+		 			get_object_address(atmel_ts, TOUCH_MULTITOUCHSCREEN_T9) + 7,
+		 			atmel_ts->config_setting[0].config_T9[7]);					
+					}
 		 		i2c_atmel_write_byte_data(atmel_ts->client,
 		 			get_object_address(atmel_ts, TOUCH_MULTITOUCHSCREEN_T9) + 11,
 		 			atmel_ts->config_setting[0].config_T9[11]);
@@ -412,7 +419,7 @@ int unregister_ts_notifier(struct notifier_block *nb)
 }
 EXPORT_SYMBOL_GPL(unregister_ts_notifier);
 
-int ts_notifier_call_chain(unsigned long val)
+int atmel_ts_notifier_call_chain(unsigned long val)
 {
 	return (blocking_notifier_call_chain(&ts_chain_head, val, NULL)
 			== NOTIFY_BAD) ? -EINVAL : 0;
@@ -429,7 +436,7 @@ static int detect_device(struct i2c_client *client)
 		return ret;
 
 
-	for (i=0; i<3; i++ )
+	for (i=0; i<1; i++ )
 	{
 		// 0xFF: synaptics rmi page select register
 		//buf = i2c_smbus_read_byte_data(client, 0xFF);
@@ -475,9 +482,10 @@ proc_read_val(char *page, char **start, off_t off, int count, int *eof,
 	else
 	len += sprintf(page + len, "IC type           : %s\n", "atmel 224");
 
-	len += sprintf(page + len, "family id         : 0x%x\n", 0x80);
-	len += sprintf(page + len, "variant id        : 0x%x\n", 0x01);
+	len += sprintf(page + len, "family id         : 0x%x\n", atmel_ts->id->family_id);
+	len += sprintf(page + len, "variant id        : 0x%x\n", atmel_ts->id->variant_id);
 	len += sprintf(page + len, "firmware version  : 0x%x\n", atmel_ts->id->version);
+	len += sprintf(page + len, "build id  : 0x%x\n", atmel_ts->id->build);
 #if defined(CONFIG_MACH_BLADE2)||defined(CONFIG_MACH_BLUETICK)
 	len += sprintf(page + len, "module            : %s\n", "atmel + Truly");
 #else
@@ -509,7 +517,8 @@ static void check_calibration(struct atmel_ts_data*ts)
   	{
 	uint8_t data[82];
 	uint8_t loop_i, loop_j, x_limit = 0, check_mask, tch_ch = 0, atch_ch = 0;
-
+	if(is_new_fw==1)
+		return ;
 	memset(data, 0xFF, sizeof(data));
 	
 	i2c_atmel_write_byte_data(ts->client,
@@ -902,12 +911,14 @@ void command_process(struct atmel_ts_data *ts, uint8_t *data)
 				i2c_atmel_write(ts->client, get_object_address(ts, SPT_CTECONFIG_T28),
 					pconfig->config_T28, get_object_size(ts, SPT_CTECONFIG_T28));
 	
+				i2c_atmel_write(ts->client, get_object_address(ts, T64),
+					pconfig->config_T64, get_object_size(ts, T64));				
 				ret = i2c_atmel_write_byte_data(ts->client, get_object_address(ts, GEN_COMMANDPROCESSOR_T6) + 1, 0x55);
 				ret = i2c_atmel_write_byte_data(ts->client, get_object_address(ts, GEN_COMMANDPROCESSOR_T6), 0x11);
 				msleep(64);
 				for (loop_i = 0; loop_i < 10; loop_i++) {
 					//if (!gpio_get_value(pconfig->gpio_irq))
-					if (!gpio_get_value( INT_TO_MSM_GPIO(ts->client->irq)))
+						if (!gpio_get_value(INT_TO_MSM_GPIO(ts->client->irq)))
 						break;
 					printk(KERN_INFO "Touch: wait for Message(%d)\n", loop_i + 1);
 					msleep(10);
@@ -918,10 +929,12 @@ void command_process(struct atmel_ts_data *ts, uint8_t *data)
 			}
 			else if (data[1] & 0x10)
 			{
+			if(is_new_fw==0){
 #ifdef TOUCH_LONG_SLIDE
 				temp_flag=0;
 				temp_flag2=0;
 #endif
+				}
 				ts->calibration_confirm = 0;
 				printk("wly: command calibration set\n");
 			}
@@ -934,6 +947,9 @@ void command_process(struct atmel_ts_data *ts, uint8_t *data)
 
 				if (ts->calibration_confirm == 0)
 				{
+					if(is_new_fw==1)
+					ts->calibration_confirm =1;
+					
 					release_all_fingers(ts);
 					check_calibration(ts);
 				}
@@ -1013,12 +1029,15 @@ void virtual_keys(struct atmel_ts_data *ts, uint8_t key_code, uint8_t key_state,
 #else
     ts->finger_data[0].y = 520;
 #endif
+    /*ergate-008*/
+    if(key_state)
+    {
     input_report_key(ts->input_dev, BTN_TOUCH, !!key_state);
     input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR,ts->finger_data[0].z);
     input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR,ts->finger_data[0].w);
     input_report_abs(ts->input_dev, ABS_MT_POSITION_X,ts->finger_data[0].x);
     input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,ts->finger_data[0].y);
-    
+    }
     //pr_err("huangjinyu report touch v-key major= %d ,width major = %d ,x = %d ,y = %d \n",ts->finger_data[0].z,ts->finger_data[0].w,ts->finger_data[0].x,ts->finger_data[0].y);
     
     input_mt_sync(ts->input_dev);	
@@ -1048,11 +1067,11 @@ static void atmel_ts_work_func(struct work_struct *work)
 				check_calibration(ts);
 
 		}
-
+if(is_new_fw==0){
 #ifdef TCH_CALIBRATION
 	//printk("huangjinyu temp_t9_7:%d,calibration_confirm:%d,temp_release:%d\n",temp_t9_7,ts->calibration_confirm,temp_release);
 	//插上USB后就不用漂了，以插USB时设置的为准
-#if defined CONFIG_TS_NOTIFIER
+#if defined CONFIG_ATMEL_TS_USB_NOTIFY
 	if(usb_status==1)
 		temp_t9_7=ts->config_setting[0].config_T9[7];
 #endif
@@ -1078,6 +1097,7 @@ static void atmel_ts_work_func(struct work_struct *work)
 	}
 	
 #endif
+}
 #ifdef FUNCTION_UNLOCK_ATCH_OFF
 	if((unlock==1)&&(check_ok==1))
 		{
@@ -1234,12 +1254,17 @@ else{
 				};
 				case 2:
 				{
+					/*ergate-008*/
+					if(ts->finger_data[loop_i].z != 0)
+					{
+					input_report_key(ts->input_dev, BTN_TOUCH, 1);
 					input_report_abs(ts->input_dev, ABS_MT_TRACKING_ID,loop_i);
 					input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR,ts->finger_data[loop_i].z);
 					input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR,ts->finger_data[loop_i].w);
 					input_report_abs(ts->input_dev, ABS_MT_POSITION_X,ts->finger_data[loop_i].x);
 					input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,ts->finger_data[loop_i].y);	
 					input_report_abs(ts->input_dev, ABS_MT_PRESSURE, ts->finger_data[loop_i].z);		
+					}
 					//pr_err("huangjinyu report touch major= %d ,width major = %d ,x = %d ,y = %d \n",ts->finger_data[loop_i].z,ts->finger_data[loop_i].w,ts->finger_data[loop_i].x,ts->finger_data[loop_i].y);
 					input_mt_sync(ts->input_dev);	
 				}break;
@@ -1247,6 +1272,7 @@ else{
 				}
 			
 		}
+		if(is_new_fw==0){
 #ifdef TCH_CALIBRATION		
 		for(loop_i =0; loop_i< ts->finger_support; loop_i ++ )
 		{
@@ -1260,7 +1286,7 @@ else{
 			temp_release=1;
 		}
 #endif
-
+		}
 #if defined (CONFIG_MACH_ATLAS32)
 			if(ts->finger_data[0].y >=490)
 			{
@@ -1281,6 +1307,8 @@ else{
 		//input_report_key(ts->input_dev, BTN_TOUCH, !!ts->finger_count);
 		//input_sync(ts->input_dev);	
 	}
+	
+	if(is_new_fw==0){
 #ifdef TOUCH_LONG_SLIDE
 	if(ts->calibration_confirm !=2){
 	if((temp_flag==0)&&((ts->finger_data[0].report_enable==2))){
@@ -1313,6 +1341,7 @@ else{
 
 	}
 #endif
+	}
 	enable_irq(ts->client->irq);
 }
 
@@ -1324,7 +1353,6 @@ static irqreturn_t atmel_ts_irq_handler(int irq, void *dev_id)
 	queue_work(ts->atmel_wq, &ts->work);
 	return IRQ_HANDLED;
 }
-//ZTE_WLY_CRDB00509514,BEGIN
 
 
 static int atmel_ts_probe(struct i2c_client *client,
@@ -1340,7 +1368,7 @@ static int atmel_ts_probe(struct i2c_client *client,
 	struct proc_dir_entry *dir, *refresh;
 	int xres, yres;
 
-	printk("%s: enter\n",__FUNCTION__);
+	printk("%s: enter----\n",__FUNCTION__);
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		printk(KERN_ERR"%s: need I2C_FUNC_I2C\n", __func__);
 		ret = -ENODEV;
@@ -1359,8 +1387,8 @@ static int atmel_ts_probe(struct i2c_client *client,
 		//ts->gpio_irq = pdata1->gpio_irq;
 		ts->gpio_init = pdata1->gpio_init;
 		ts->power = pdata1->power;
-		ts->reset	= pdata1->reset;
-		ts->irq 	= NULL;
+		ts->reset = pdata1->reset;
+		ts->irq	  = NULL;
 		memcpy(ts->fwfile,pdata1->fwfile,sizeof(pdata1->fwfile));
 		//intr = pdata1->gpio_irq;
 	}else{
@@ -1375,7 +1403,7 @@ static int atmel_ts_probe(struct i2c_client *client,
 			goto err_power_failed;
 		}
 		if (ts->power) ts->power(1);
-		msleep(250);
+		msleep(50);
 	}
 
 	if ( !detect_device( client )){
@@ -1418,7 +1446,7 @@ static int atmel_ts_probe(struct i2c_client *client,
 	ts->id->variant_id = data[1];
 	if (ts->id->family_id == 0x80 && ((ts->id->variant_id == 0x01)||(ts->id->variant_id == 0x07)))
 		ts->id->version = data[2];
-		else ts->id->version =0x16;
+		else ts->id->version =data[2];
 
 	ts->id->build = data[3];
 	ts->id->matrix_x_size = data[4];
@@ -1430,6 +1458,12 @@ static int atmel_ts_probe(struct i2c_client *client,
 	ts->id->version, ts->id->build,
 	ts->id->matrix_x_size, ts->id->matrix_y_size,
 	ts->id->num_declared_objects);
+
+	if ((ts->id->family_id==0x80)&&(ts->id->variant_id==0x16)&&(ts->id->version==0x10))
+	{
+		printk(KERN_ERR"%s: is the new fw\n",__func__);
+		is_new_fw=1;
+	}
 
 	/* Read object table. */
 	ts->object_table = kzalloc(sizeof(struct object_t)*ts->id->num_declared_objects, GFP_KERNEL);
@@ -1463,9 +1497,10 @@ static int atmel_ts_probe(struct i2c_client *client,
 		printk(KERN_INFO"finger_type: %d, max finger: %d\n", ts->finger_type, ts->finger_support);
 
 		/*infoamtion block CRC check */
+		if(is_new_fw==0){
 		if (pconfig->object_crc[0]) {
 			ret = i2c_atmel_write_byte_data(client,
-				get_object_address(ts, GEN_COMMANDPROCESSOR_T6) + 1, 0x55);
+				get_object_address(ts, GEN_COMMANDPROCESSOR_T6) + 2, 0x55);
 			msleep(64);
 			for (loop_i = 0; loop_i < 10; loop_i++) {
 				ret = i2c_atmel_read(ts->client, get_object_address(ts,
@@ -1489,6 +1524,35 @@ static int atmel_ts_probe(struct i2c_client *client,
 				CRC_check = 1;
 			}
 		}
+			}else{
+			if (pconfig->object_crc[3]) {
+				ret = i2c_atmel_write_byte_data(client,
+					get_object_address(ts, GEN_COMMANDPROCESSOR_T6) + 2, 0x55);
+				msleep(64);
+				for (loop_i = 0; loop_i < 10; loop_i++) {
+					ret = i2c_atmel_read(ts->client, get_object_address(ts,
+						GEN_MESSAGEPROCESSOR_T5), data, 9);
+						printk(KERN_INFO "crc checksum: %3d, %3d, %3d\n",data[2],data[3],data[4]);
+					  if (data[0] == get_report_ids_size(ts, GEN_COMMANDPROCESSOR_T6))
+						break;
+					msleep(5);
+				}
+				for (loop_i = 0; loop_i < 3; loop_i++) {
+					if (pconfig->object_crc[loop_i+3] != data[loop_i + 2]) {
+						printk(KERN_ERR"CRC Error: %3d, %3d\n", pconfig->object_crc[loop_i+3], data[loop_i + 2]);
+						break;
+					}
+				}
+				if (loop_i == 3) {
+					printk(KERN_INFO "CRC passed: ");
+					for (loop_i = 0; loop_i < 3; loop_i++)
+						printk("%3d ", pconfig->object_crc[loop_i+3]);
+					printk("\n");
+					CRC_check = 1;
+				}
+			}
+
+				}
 		ts->abs_x_min = pconfig->abs_x_min;
 		ts->abs_x_max = pconfig->abs_x_max;
 		ts->abs_y_min = pconfig->abs_y_min;
@@ -1518,7 +1582,7 @@ static int atmel_ts_probe(struct i2c_client *client,
 		ts->config_setting[0].config_T9 = pconfig->config_T9;
 		ts->config_setting[0].config_T22 = pconfig->config_T22;
 		ts->config_setting[0].config_T28 = pconfig->config_T28;
-#if defined(CONFIG_TS_NOTIFIER)		
+#if defined(CONFIG_ATMEL_TS_USB_NOTIFY)		
 		ts->config_setting[0].config_T9_charge = pconfig->config_T9_charge;
 		ts->config_setting[0].config_T28_charge = pconfig->config_T28_charge;
 #endif
@@ -1546,6 +1610,17 @@ static int atmel_ts_probe(struct i2c_client *client,
 		if (!CRC_check) 
 		{
 			printk(KERN_INFO "Touch: Config reload\n");
+			if(is_new_fw==1){
+				ret = i2c_atmel_write_byte_data(client, get_object_address(ts, GEN_COMMANDPROCESSOR_T6), 0x11);
+				msleep(64);
+				for (loop_i = 0; loop_i < 10; loop_i++) {
+					//if (!gpio_get_value(ts->gpio_irq))
+					if (!gpio_get_value( INT_TO_MSM_GPIO(client->irq)))
+						break;
+					printk(KERN_INFO "Touch: wait for Message(%d)\n", loop_i + 1);
+					msleep(10);
+				}
+			}
 			i2c_atmel_write(ts->client, get_object_address(ts, GEN_POWERCONFIG_T7),
 				pconfig->config_T7, get_object_size(ts, GEN_POWERCONFIG_T7));
 			i2c_atmel_write(ts->client, get_object_address(ts, GEN_ACQUISITIONCONFIG_T8),
@@ -1570,13 +1645,15 @@ static int atmel_ts_probe(struct i2c_client *client,
 				pconfig->config_T27, get_object_size(ts, PROCI_TWOTOUCHGESTUREPROCESSOR_T27));
 			i2c_atmel_write(ts->client, get_object_address(ts, SPT_CTECONFIG_T28),
 				pconfig->config_T28, get_object_size(ts, SPT_CTECONFIG_T28));
+			i2c_atmel_write(ts->client, get_object_address(ts, T64),
+				pconfig->config_T64, get_object_size(ts, T64));
 
 			ret = i2c_atmel_write_byte_data(client, get_object_address(ts, GEN_COMMANDPROCESSOR_T6) + 1, 0x55);
 			ret = i2c_atmel_write_byte_data(client, get_object_address(ts, GEN_COMMANDPROCESSOR_T6), 0x11);
 			msleep(64);
 			for (loop_i = 0; loop_i < 10; loop_i++) {
-				//if (!gpio_get_value(ts->gpio_irq))
-				if (!gpio_get_value(INT_TO_MSM_GPIO(client->irq)))
+//				if (!gpio_get_value(ts->gpio_irq))
+					if (!gpio_get_value( INT_TO_MSM_GPIO(client->irq)))
 					break;
 				printk(KERN_INFO "Touch: wait for Message(%d)\n", loop_i + 1);
 				msleep(10);
@@ -1597,8 +1674,16 @@ static int atmel_ts_probe(struct i2c_client *client,
      			msleep(10);
      		}
 		}
+		if (is_new_fw==1)
+		{
+   			i2c_atmel_write_byte_data(ts->client,
+   				get_object_address(ts, GEN_ACQUISITIONCONFIG_T8) + 8,
+   				50);	
+   			i2c_atmel_write_byte_data(ts->client,
+   				get_object_address(ts, GEN_ACQUISITIONCONFIG_T8) + 9,
+   				0);	
+		}
 	}
-
 	ts->input_dev = input_allocate_device();
 	if (ts->input_dev == NULL) {
 		ret = -ENOMEM;
@@ -1621,6 +1706,8 @@ static int atmel_ts_probe(struct i2c_client *client,
 	set_bit(ABS_MT_WIDTH_MAJOR, ts->input_dev->absbit);
 	set_bit(ABS_MT_ORIENTATION, ts->input_dev->absbit);
 	set_bit(ABS_MT_PRESSURE, ts->input_dev->absbit);
+	/*ergate-008*/
+	set_bit(BTN_TOUCH, ts->input_dev->keybit);
 	input_set_abs_params(ts->input_dev, ABS_MT_TRACKING_ID,
 				0, 10, 0, 0);
 	input_set_abs_params(ts->input_dev, ABS_MT_POSITION_X,
@@ -1651,6 +1738,8 @@ static int atmel_ts_probe(struct i2c_client *client,
 	//enable_irq(client->irq);
 
 		//ADD BY HUANGJINYU
+		
+	if(is_new_fw==0){
 		printk("atmel probe set the calibration\n");
 #ifdef TCH_CALIBRATION
 			temp_t9_7=temp_t9_7_def1;
@@ -1669,6 +1758,7 @@ static int atmel_ts_probe(struct i2c_client *client,
 		i2c_atmel_write_byte_data(client,
 			get_object_address(ts, GEN_ACQUISITIONCONFIG_T8) + 8, 10);
 		//ADD BY HUANGJINYU END
+		}
 		
 #ifdef ENABLE_IME_IMPROVEMENT
 	ts->ime_threshold_pixel = 1;
@@ -1708,7 +1798,7 @@ static int atmel_ts_probe(struct i2c_client *client,
 	}
 
 
-#ifdef CONFIG_TS_NOTIFIER
+#ifdef CONFIG_ATMEL_TS_USB_NOTIFY
 		register_ts_notifier(&ts_notifier);
 #endif
 
@@ -1783,6 +1873,7 @@ static int atmel_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 static int atmel_ts_resume(struct i2c_client *client)
 {
 	struct atmel_ts_data *ts = i2c_get_clientdata(client);
+	if(is_new_fw==0){
 #ifdef TCH_CALIBRATION
 	uint8_t data[82];
 	uint8_t loop_i, loop_j, x_limit = 0, check_mask, tch_ch = 0, atch_ch = 0;
@@ -1870,7 +1961,7 @@ static int atmel_ts_resume(struct i2c_client *client)
 
 
 #ifdef TCH_CALIBRATION
-#if defined CONFIG_TS_NOTIFIER
+#if defined CONFIG_ATMEL_TS_USB_NOTIFY
 	
 		release_all_fingers(ts);
         	if(tch_ch>0){
@@ -2041,6 +2132,16 @@ static int atmel_ts_resume(struct i2c_client *client)
 		
 
 #endif
+		}else{
+	i2c_atmel_write(ts->client, get_object_address(ts, GEN_POWERCONFIG_T7),
+		ts->config_setting[0].config_T7, get_object_size(ts, GEN_POWERCONFIG_T7));
+	printk("***********: go to check calibration\n");
+		ts->calibration_confirm = 0;
+		release_all_fingers(ts);
+
+		i2c_atmel_write_byte_data(client,
+			get_object_address(ts, GEN_COMMANDPROCESSOR_T6) + 2, 0x55);	
+}
 	enable_irq(client->irq);
 	return 0;
 }

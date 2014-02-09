@@ -19,9 +19,7 @@
 /*histstory:
  when       	who     what, where, why                                            comment tag
  --------   	------    ---------------------------------------------------    ----------------------------------
- 2009-10-23    hp     merge gsensor support 																		ZTE_SENSOR_HP_001
- 											add cooridinate to match android cooridinate
- 2009-11-16    hp     change into ioctl interface                               ZTE_SENSOR_HP_002
+ 
 
 */
 
@@ -32,7 +30,7 @@
 #include <linux/input.h>
 #include <linux/ioctl.h>
 
-//ZTE_SENSOR_HP_002 2009-11-16 for ioctl
+
 
 #define LIS302IO				0xA1
 /* IOCTLs*/
@@ -42,7 +40,7 @@
 #define LIS302DL_IOCTL_READ_ACCELERATION    _IOWR(LIS302IO, 0x34, short[3])
 #define LIS302DL_IOCTL_SET_MODE	  _IOW(LIS302IO, 0x35, short)
 #define LIS302DL_IOCTL_GET_INT	  _IOR(LIS302IO, 0x36, short)
-//ZTE_SENSOR_HP_002 end
+
 enum lis302dl_reg {
     LIS302DL_REG_WHO_AM_I		= 0x0f,
     LIS302DL_REG_CTRL1		= 0x20,

@@ -91,11 +91,10 @@ struct synaptics_rmi4_data{
 	int use_irq;
 	int gpio_irq;
 	struct hrtimer timer;
-	//struct hrtimer resume_timer;  //ZTE_WLY_CRDB00512790
 	struct work_struct  work;
 	__u16 max[2];			// maxmum x/y position supported
 	struct early_suspend early_suspend;
-	__u32 dup_threshold;    //ZTE_XUKE_TOUCH_THRESHOLD_20100201
+	__u32 dup_threshold;    
 
 	__u8 points_supported;
 	__u8 points_needed;	

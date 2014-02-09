@@ -233,10 +233,10 @@ static struct snddev_icodec_data snddev_ihs_stereo_rx_data = {
 	.profile = &ihs_stereo_rx_profile,
 	.channel_mode = 2,
 	.default_sample_rate = 48000,
-	.pamp_on = msm_snddev_hsed_voltage_on,      
-	.pamp_off = msm_snddev_hsed_voltage_off,     
-	.voltage_on = NULL,//msm_snddev_enable_amic_power, 
-	.voltage_off = NULL,//msm_snddev_disable_amic_power, 
+	.pamp_on = msm_snddev_hsed_voltage_on,       //zrlean
+	.pamp_off = msm_snddev_hsed_voltage_off,     //zrlean
+	.voltage_on = NULL,//msm_snddev_enable_amic_power, //zrlean
+	.voltage_off = NULL,//msm_snddev_disable_amic_power, //zrlean
 	.property = SIDE_TONE_MASK,
 	.max_voice_rx_vol[VOC_NB_INDEX] = -700,
 	.min_voice_rx_vol[VOC_NB_INDEX] = -2200,
@@ -279,10 +279,10 @@ static struct snddev_icodec_data snddev_fm_headset_stereo_rx_data = {
 	.profile = &fm_stereo_rx_profile,
 	.channel_mode = 2,
 	.default_sample_rate = 48000,
-	.pamp_on = msm_snddev_hsed_voltage_on,       
-	.pamp_off = msm_snddev_hsed_voltage_off,     
-	.voltage_on = NULL,//msm_snddev_enable_amic_power, 
-	.voltage_off = NULL,//msm_snddev_disable_amic_power, 
+	.pamp_on = msm_snddev_hsed_voltage_on,       //zrlean
+	.pamp_off = msm_snddev_hsed_voltage_off,     //zrlean
+	.voltage_on = NULL,//msm_snddev_enable_amic_power, //zrlean
+	.voltage_off = NULL,//msm_snddev_disable_amic_power, //zrlean
 	.max_voice_rx_vol[VOC_NB_INDEX] = -700,
 	.min_voice_rx_vol[VOC_NB_INDEX] = -2200,
 	.max_voice_rx_vol[VOC_WB_INDEX] = -900,
@@ -1627,12 +1627,12 @@ static struct platform_device *snd_devices_surf[] __initdata = {
 	&msm_snddev_mi2s_stereo_rx_device,
 	&msm_snddev_mi2s_fm_tx_device,
 	&msm_uplink_rx_device,
-#if 1
-	&msm_ihac_rx_device, 	
+#if 1//defined(ZTE_FEATURE_HAC)
+	&msm_ihac_rx_device,
 #endif
 	&msm_ispeaker_aux_tx_device,
-	&msm_fm_headset_stereo_tx_device, 
-	&msm_fm_headset_stereo_rx_device 
+	&msm_fm_headset_stereo_tx_device,
+	&msm_fm_headset_stereo_rx_device
 
 };
 

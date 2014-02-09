@@ -16,6 +16,8 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/debugfs.h>
+#include <linux/pm_qos.h>
+
 #include <asm/uaccess.h>
 #include <mach/qdsp5v2/snddev_icodec.h>
 #include <mach/qdsp5v2/audio_dev_ctl.h>
@@ -31,6 +33,7 @@
 #include <mach/rpc_pmapp.h>
 #include <mach/qdsp5v2/audio_acdb_def.h>
 #include <linux/slab.h>
+#include <mach/cpuidle.h>
 
 #ifdef CONFIG_MACH_BLADEPLUS
 #include <mach/board.h> //zrlean
@@ -163,8 +166,8 @@ struct snddev_icodec_drv_state {
 	struct clk *lpa_p_clk;
 	struct lpa_drv *lpa;
 
-	struct wake_lock rx_idlelock;
-	struct wake_lock tx_idlelock;
+	struct pm_qos_request rx_pm_qos_req;
+	struct pm_qos_request tx_pm_qos_req;
 };
 
 static struct snddev_icodec_drv_state snddev_icodec_drv;
@@ -177,7 +180,8 @@ static int snddev_icodec_open_rx(struct snddev_icodec_state *icodec)
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;
 	struct lpa_codec_config lpa_config;
 
-	wake_lock(&drv->rx_idlelock);
+	pm_qos_update_request(&drv->rx_pm_qos_req,
+			      msm_cpuidle_get_deep_idle_latency());
 
 	if ((icodec->data->acdb_id == ACDB_ID_HEADSET_SPKR_MONO) ||
 		(icodec->data->acdb_id == ACDB_ID_HEADSET_SPKR_STEREO)) {
@@ -199,12 +203,12 @@ static int snddev_icodec_open_rx(struct snddev_icodec_state *icodec)
 		SNDDEV_ICODEC_CLK_RATE(icodec->sample_rate));
 	if (IS_ERR_VALUE(trc))
 		goto error_invalid_freq;
-	clk_enable(drv->rx_mclk);
-	clk_enable(drv->rx_sclk);
+	clk_prepare_enable(drv->rx_mclk);
+	clk_prepare_enable(drv->rx_sclk);
 	/* clk_set_rate(drv->lpa_codec_clk, 1); */ /* Remove if use pcom */
-	clk_enable(drv->lpa_p_clk);
-	clk_enable(drv->lpa_codec_clk);
-	clk_enable(drv->lpa_core_clk);
+	clk_prepare_enable(drv->lpa_p_clk);
+	clk_prepare_enable(drv->lpa_codec_clk);
+	clk_prepare_enable(drv->lpa_core_clk);
 
 	/* Enable LPA sub system
 	 */
@@ -254,7 +258,7 @@ static int snddev_icodec_open_rx(struct snddev_icodec_state *icodec)
 
 	icodec->enabled = 1;
 
-	wake_unlock(&drv->rx_idlelock);
+	pm_qos_update_request(&drv->rx_pm_qos_req, PM_QOS_DEFAULT_VALUE);
 	return 0;
 
 error_afe:
@@ -263,16 +267,16 @@ error_afe:
 error_adie:
 	lpa_put(drv->lpa);
 error_lpa:
-	clk_disable(drv->lpa_p_clk);
-	clk_disable(drv->lpa_codec_clk);
-	clk_disable(drv->lpa_core_clk);
-	clk_disable(drv->rx_sclk);
-	clk_disable(drv->rx_mclk);
+	clk_disable_unprepare(drv->lpa_p_clk);
+	clk_disable_unprepare(drv->lpa_codec_clk);
+	clk_disable_unprepare(drv->lpa_core_clk);
+	clk_disable_unprepare(drv->rx_sclk);
+	clk_disable_unprepare(drv->rx_mclk);
 error_invalid_freq:
 
 	MM_ERR("encounter error\n");
 
-	wake_unlock(&drv->rx_idlelock);
+	pm_qos_update_request(&drv->rx_pm_qos_req, PM_QOS_DEFAULT_VALUE);
 	return -ENODEV;
 }
 
@@ -283,7 +287,8 @@ static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 	struct msm_afe_config afe_config;
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;;
 
-	wake_lock(&drv->tx_idlelock);
+	pm_qos_update_request(&drv->tx_pm_qos_req,
+			      msm_cpuidle_get_deep_idle_latency());
 
 	/* Vote for PWM mode*/
 	err = pmapp_smps_mode_vote(SMPS_AUDIO_RECORD_ID,
@@ -315,8 +320,8 @@ static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 		SNDDEV_ICODEC_CLK_RATE(icodec->sample_rate));
 	if (IS_ERR_VALUE(trc))
 		goto error_invalid_freq;
-	clk_enable(drv->tx_mclk);
-	clk_enable(drv->tx_sclk);
+	clk_prepare_enable(drv->tx_mclk);
+	clk_prepare_enable(drv->tx_sclk);
 
 	/* Set MI2S */
 	mi2s_set_codec_input_path((icodec->data->channel_mode ==
@@ -345,15 +350,15 @@ static int snddev_icodec_open_tx(struct snddev_icodec_state *icodec)
 
 	icodec->enabled = 1;
 
-	wake_unlock(&drv->tx_idlelock);
+	pm_qos_update_request(&drv->tx_pm_qos_req, PM_QOS_DEFAULT_VALUE);
 	return 0;
 
 error_afe:
 	adie_codec_close(icodec->adie_path);
 	icodec->adie_path = NULL;
 error_adie:
-	clk_disable(drv->tx_sclk);
-	clk_disable(drv->tx_mclk);
+	clk_disable_unprepare(drv->tx_sclk);
+	clk_disable_unprepare(drv->tx_mclk);
 error_invalid_freq:
 
 	/* Disable mic bias */
@@ -367,7 +372,7 @@ error_invalid_freq:
 
 	MM_ERR("encounter error\n");
 
-	wake_unlock(&drv->tx_idlelock);
+	pm_qos_update_request(&drv->tx_pm_qos_req, PM_QOS_DEFAULT_VALUE);
 	return -ENODEV;
 }
 
@@ -394,7 +399,8 @@ static int snddev_icodec_close_rx(struct snddev_icodec_state *icodec)
 	int err;
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;
 
-	wake_lock(&drv->rx_idlelock);
+	pm_qos_update_request(&drv->rx_pm_qos_req,
+			      msm_cpuidle_get_deep_idle_latency());
 
 	/* Remove the vote for SMPS mode*/
 	err = pmapp_smps_mode_vote(SMPS_AUDIO_PLAYBACK_ID,
@@ -421,18 +427,18 @@ static int snddev_icodec_close_rx(struct snddev_icodec_state *icodec)
 	lpa_put(drv->lpa);
 
 	/* Disable LPA clocks */
-	clk_disable(drv->lpa_p_clk);
-	clk_disable(drv->lpa_codec_clk);
-	clk_disable(drv->lpa_core_clk);
+	clk_disable_unprepare(drv->lpa_p_clk);
+	clk_disable_unprepare(drv->lpa_codec_clk);
+	clk_disable_unprepare(drv->lpa_core_clk);
 
 	/* Disable MI2S RX master block */
 	/* Disable MI2S RX bit clock */
-	clk_disable(drv->rx_sclk);
-	clk_disable(drv->rx_mclk);
+	clk_disable_unprepare(drv->rx_sclk);
+	clk_disable_unprepare(drv->rx_mclk);
 
 	icodec->enabled = 0;
 
-	wake_unlock(&drv->rx_idlelock);
+	pm_qos_update_request(&drv->rx_pm_qos_req, PM_QOS_DEFAULT_VALUE);
 	return 0;
 }
 
@@ -441,7 +447,8 @@ static int snddev_icodec_close_tx(struct snddev_icodec_state *icodec)
 	struct snddev_icodec_drv_state *drv = &snddev_icodec_drv;
 	int i, err;
 
-	wake_lock(&drv->tx_idlelock);
+	pm_qos_update_request(&drv->tx_pm_qos_req,
+			      msm_cpuidle_get_deep_idle_latency());
 
 	/* Remove the vote for SMPS mode*/
 	err = pmapp_smps_mode_vote(SMPS_AUDIO_RECORD_ID,
@@ -458,8 +465,8 @@ static int snddev_icodec_close_tx(struct snddev_icodec_state *icodec)
 
 	/* Disable MI2S TX master block */
 	/* Disable MI2S TX bit clock */
-	clk_disable(drv->tx_sclk);
-	clk_disable(drv->tx_mclk);
+	clk_disable_unprepare(drv->tx_sclk);
+	clk_disable_unprepare(drv->tx_mclk);
 
 	/* Disable mic bias */
 	for (i = 0; i < icodec->data->pmctl_id_sz; i++) {
@@ -482,7 +489,7 @@ static int snddev_icodec_close_tx(struct snddev_icodec_state *icodec)
 
 	icodec->enabled = 0;
 
-	wake_unlock(&drv->tx_idlelock);
+	pm_qos_update_request(&drv->tx_pm_qos_req, PM_QOS_DEFAULT_VALUE);
 	return 0;
 }
 
@@ -904,8 +911,8 @@ static void debugfs_adie_loopback(u32 loop)
 		/* enable MI2S RX bit clock */
 		clk_set_rate(drv->rx_mclk,
 			SNDDEV_ICODEC_CLK_RATE(8000));
-		clk_enable(drv->rx_mclk);
-		clk_enable(drv->rx_sclk);
+		clk_prepare_enable(drv->rx_mclk);
+		clk_prepare_enable(drv->rx_sclk);
 
 		MM_INFO("configure ADIE RX path\n");
 		/* Configure ADIE */
@@ -920,8 +927,8 @@ static void debugfs_adie_loopback(u32 loop)
 		/* enable MI2S TX bit clock */
 		clk_set_rate(drv->tx_mclk,
 			SNDDEV_ICODEC_CLK_RATE(8000));
-		clk_enable(drv->tx_mclk);
-		clk_enable(drv->tx_sclk);
+		clk_prepare_enable(drv->tx_mclk);
+		clk_prepare_enable(drv->tx_sclk);
 
 		MM_INFO("configure ADIE TX path\n");
 		/* Configure ADIE */
@@ -942,13 +949,13 @@ static void debugfs_adie_loopback(u32 loop)
 
 		/* Disable MI2S RX master block */
 		/* Disable MI2S RX bit clock */
-		clk_disable(drv->rx_sclk);
-		clk_disable(drv->rx_mclk);
+		clk_disable_unprepare(drv->rx_sclk);
+		clk_disable_unprepare(drv->rx_mclk);
 
 		/* Disable MI2S TX master block */
 		/* Disable MI2S TX bit clock */
-		clk_disable(drv->tx_sclk);
-		clk_disable(drv->tx_mclk);
+		clk_disable_unprepare(drv->tx_sclk);
+		clk_disable_unprepare(drv->tx_mclk);
 	}
 }
 
@@ -970,11 +977,11 @@ static void debugfs_afe_loopback(u32 loop)
 		SNDDEV_ICODEC_CLK_RATE(8000));
 		if (IS_ERR_VALUE(trc))
 			MM_ERR("failed to set clk rate\n");
-		clk_enable(drv->rx_mclk);
-		clk_enable(drv->rx_sclk);
-		clk_enable(drv->lpa_p_clk);
-		clk_enable(drv->lpa_codec_clk);
-		clk_enable(drv->lpa_core_clk);
+		clk_prepare_enable(drv->rx_mclk);
+		clk_prepare_enable(drv->rx_sclk);
+		clk_prepare_enable(drv->lpa_p_clk);
+		clk_prepare_enable(drv->lpa_codec_clk);
+		clk_prepare_enable(drv->lpa_core_clk);
 		/* Enable LPA sub system
 		 */
 		drv->lpa = lpa_get();
@@ -1018,8 +1025,8 @@ static void debugfs_afe_loopback(u32 loop)
 		/* enable MI2S TX bit clock */
 		clk_set_rate(drv->tx_mclk,
 			SNDDEV_ICODEC_CLK_RATE(8000));
-		clk_enable(drv->tx_mclk);
-		clk_enable(drv->tx_sclk);
+		clk_prepare_enable(drv->tx_mclk);
+		clk_prepare_enable(drv->tx_sclk);
 		/* Set MI2S */
 		mi2s_set_codec_input_path(MI2S_CHAN_MONO_PACKED, WT_16_BIT);
 		MM_INFO("configure ADIE TX path\n");
@@ -1063,14 +1070,14 @@ static void debugfs_afe_loopback(u32 loop)
 		lpa_put(drv->lpa);
 
 		/* Disable LPA clocks */
-		clk_disable(drv->lpa_p_clk);
-		clk_disable(drv->lpa_codec_clk);
-		clk_disable(drv->lpa_core_clk);
+		clk_disable_unprepare(drv->lpa_p_clk);
+		clk_disable_unprepare(drv->lpa_codec_clk);
+		clk_disable_unprepare(drv->lpa_core_clk);
 
 		/* Disable MI2S RX master block */
 		/* Disable MI2S RX bit clock */
-		clk_disable(drv->rx_sclk);
-		clk_disable(drv->rx_mclk);
+		clk_disable_unprepare(drv->rx_sclk);
+		clk_disable_unprepare(drv->rx_mclk);
 
 		pmapp_smps_mode_vote(SMPS_AUDIO_RECORD_ID,
 			PMAPP_VREG_S4, PMAPP_SMPS_MODE_VOTE_DONTCARE);
@@ -1084,8 +1091,8 @@ static void debugfs_afe_loopback(u32 loop)
 		adie_codec_close(debugfs_tx_adie);
 		/* Disable MI2S TX master block */
 		/* Disable MI2S TX bit clock */
-		clk_disable(drv->tx_sclk);
-		clk_disable(drv->tx_mclk);
+		clk_disable_unprepare(drv->tx_sclk);
+		clk_disable_unprepare(drv->tx_mclk);
 		pmic_hsed_enable(PM_HSED_CONTROLLER_0, PM_HSED_ENABLE_OFF);
 		MM_INFO("AFE loopback disabled\n");
 	}
@@ -1178,10 +1185,10 @@ static int __init snddev_icodec_init(void)
 	icodec_drv->rx_active = 0;
 	icodec_drv->tx_active = 0;
 	icodec_drv->lpa = NULL;
-	wake_lock_init(&icodec_drv->tx_idlelock, WAKE_LOCK_IDLE,
-			"snddev_tx_idle");
-	wake_lock_init(&icodec_drv->rx_idlelock, WAKE_LOCK_IDLE,
-			"snddev_rx_idle");
+	pm_qos_add_request(&icodec_drv->tx_pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
+				PM_QOS_DEFAULT_VALUE);
+	pm_qos_add_request(&icodec_drv->rx_pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
+				PM_QOS_DEFAULT_VALUE);
 	return 0;
 
 error_lpa_p_clk:

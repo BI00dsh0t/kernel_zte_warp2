@@ -42,7 +42,7 @@ static struct vreg *vdd, *vbus;
 //
 //	touchscreen firmware file name
 //
-#if defined (CONFIG_MACH_WARP2)
+#if defined (CONFIG_MACH_WARP2)||defined(CONFIG_MACH_RADIANT) 
 #define FTC_FW_NAME ""
 #define SYN_FW_NAME "N970_N861_PR1183396_s2202_32313037.img"
 #define ATM_FW_NAME ""
@@ -65,7 +65,19 @@ static struct vreg *vdd, *vbus;
 #define CAP_TS_VKEY_FTS "virtualkeys.Fts-touchscreen"
 
 // board warp2
-#if defined (CONFIG_MACH_WARP2)
+#if defined (CONFIG_MACH_WARP2)||defined(CONFIG_MACH_RADIANT) 
+#if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_P856S30)
+#define SYNAPTICS_MAX_Y_POSITION	1786
+static ssize_t cap_ts_vkeys_show(struct device *dev,	struct device_attribute *attr, char *buf)
+{
+	//printk("%s, %s\n",__func__,attr->attr.name);
+	return sprintf(
+		buf,__stringify(EV_KEY) ":" __stringify(KEY_BACK) ":85:836:100:50"
+		":" __stringify(EV_KEY) ":" __stringify(KEY_HOME) ":240:836:100:50"
+		":" __stringify(EV_KEY) ":" __stringify(KEY_MENU) ":390:836:100:50"
+		"\n");	
+}
+#else
 #define SYNAPTICS_MAX_Y_POSITION	1885
 static ssize_t cap_ts_vkeys_show(struct device *dev,	struct device_attribute *attr, char *buf)
 {
@@ -76,6 +88,7 @@ static ssize_t cap_ts_vkeys_show(struct device *dev,	struct device_attribute *at
 		":" __stringify(EV_KEY) ":" __stringify(KEY_MENU) ":460:1020:150:80"
 		"\n");	
 }
+#endif
 
 // board sean
 #elif defined (CONFIG_MACH_SEAN)
@@ -88,6 +101,17 @@ static ssize_t cap_ts_vkeys_show(struct device *dev,	struct device_attribute *at
 		":" __stringify(EV_KEY) ":" __stringify(KEY_MENU) ":120:510:100:60"
 		":" __stringify(EV_KEY) ":" __stringify(KEY_BACK) ":200:510:100:60"
 		":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":280:510:100:60"
+		"\n");	
+}
+#elif defined (CONFIG_MACH_RADIANT)
+#define SYNAPTICS_MAX_Y_POSITION	1885
+static ssize_t cap_ts_vkeys_show(struct device *dev,	struct device_attribute *attr, char *buf)
+{
+	//printk("%s, %s\n",__func__,attr->attr.name);
+	return sprintf(
+		buf,__stringify(EV_KEY) ":" __stringify(KEY_BACK) ":80:1020:150:80"
+		":" __stringify(EV_KEY) ":" __stringify(KEY_HOME) ":270:1020:150:80"
+		":" __stringify(EV_KEY) ":" __stringify(KEY_MENU) ":460:1020:150:80"
 		"\n");	
 }
 #endif

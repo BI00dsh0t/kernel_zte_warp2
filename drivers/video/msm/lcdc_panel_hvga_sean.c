@@ -18,17 +18,6 @@
 /* ========================================================================================
 when         who        what, where, why                                  comment tag
 --------     ----       -----------------------------                --------------------------
-2011-01-25   luya    	modify for 743	CRDB00603861 			ZTE_LCD_LUYA_20110125_001
-2010-06-29   luya    	modify mdelay to msleep		 			ZTE_LCD_LUYA_20100629_001
-2010-06-11   lht		project mode display panel info         	ZTE_LCD_LHT_20100611_001
-2010-05-29   luya    	add delay when init finish		 			ZTE_LCD_LUYA_20100529_001
-2010-05-22   luya    	modify BKL reg setting			 			ZTE_LCD_LUYA_20100522_001
-2010-05-17   luya    	delete mdelay					 			ZTE_LCD_LUYA_20100517_001
-2010-05-13   luya    	not init for the 1st time			 		ZTE_LCD_LUYA_20100513_001
-2010-05-07   luya    	modify 729 BKL reg			 				ZTE_LCD_LUYA_20100507_001
-2010-04-28   luya    	modify delay of bkl adjust		 			ZTE_LCD_LUYA_20100428_002
-2010-04-14   luya    	modify for 729 bkl		 					ZTE_LCD_LUYA_20100414_001
-2010-03-25   luya    	merge samsung oled driver		 			ZTE_LCD_LUYA_20100325_001
 
 ==========================================================================================*/
 
@@ -50,15 +39,15 @@ typedef enum
 
 static LCD_PANEL_TYPE g_lcd_panel_type = LCD_PANEL_NONE;
 
-static boolean is_firsttime = true;		///ZTE_LCD_LUYA_20091221_001
-extern u32 LcdPanleID;   //ZTE_LCD_LHT_20100611_001
+static boolean is_firsttime = true;		
+extern u32 LcdPanleID;   
 static int spi_cs;
 static int spi_sclk;
 static int spi_sdi;
 static int spi_sdo;
 static int panel_reset;
 static bool onewiremode = true;
-///ZTE_LCD_LUYA_20100414_001	//ZTE_LCD_LUYA_20100507_001,,ZTE_LCD_LUYA_20100522_001
+
 static struct msm_panel_common_pdata * lcdc_tft_pdata;
 
 static void R61529_WriteReg(unsigned char SPI_COMMD);
@@ -81,15 +70,14 @@ static void SPI_Stop(void)
 }
 #endif
 
-////ZTE_LCD_LUYA_20100716_001
 static void select_1wire_mode(void)
 {
 	gpio_direction_output(GPIO_LCD_BL_SC_OUT, 1);
 	udelay(120);
 	gpio_direction_output(GPIO_LCD_BL_SC_OUT, 0);
-	udelay(280);				////ZTE_LCD_LUYA_20100226_001
+	udelay(280);				
 	gpio_direction_output(GPIO_LCD_BL_SC_OUT, 1);
-	udelay(650);				////ZTE_LCD_LUYA_20100226_001
+	udelay(650);				
 	
 }
 
@@ -169,7 +157,7 @@ static void lcdc_set_bl(struct msm_fb_data_type *mfd)
 
     if(!mfd->panel_power_on)
 	{
-    	gpio_direction_output(GPIO_LCD_BL_SC_OUT, 0);			///ZTE_LCD_LUYA_20100201_001
+    	gpio_direction_output(GPIO_LCD_BL_SC_OUT, 0);			
 	    return;
     }
 
@@ -184,7 +172,6 @@ static void lcdc_set_bl(struct msm_fb_data_type *mfd)
 
 
 
-    /*ZTE_BACKLIGHT_WLY_005,@2009-11-28, set backlight as 32 levels, end*/
     local_irq_save(flags);
     if(current_lel==0)
     {
@@ -213,7 +200,6 @@ static int lcdc_panel_on(struct platform_device *pdev)
 {
 
 	spi_init();
-///ZTE_LCD_LUYA_20091221_001,start	ZTE_LCD_LUYA_20100513_001
 	if(!is_firsttime)
 	{
 		lcd_panel_init();
@@ -223,11 +209,9 @@ static int lcdc_panel_on(struct platform_device *pdev)
 	{
 		is_firsttime = false;
 	}
-///ZTE_LCD_LUYA_20091221_001,end	
 	return 0;
 }
 
-/***added by zte_gequn091966,20110429***/
 static void R61529_WriteReg(unsigned char SPI_COMMD)
 {
 	unsigned short SBit,SBuffer;
@@ -458,8 +442,8 @@ static void spi_init(void)
 	gpio_set_value(spi_sclk, 1);
 	gpio_set_value(spi_sdo, 1);
 	gpio_set_value(spi_cs, 1);
-//	mdelay(10);			////ZTE_LCD_LUYA_20100513_001
-	msleep(20);				////ZTE_LCD_LUYA_20100629_001
+//	mdelay(10);			
+	msleep(20);				
 
 }
 void lcdc_truly_sleep(void)
@@ -483,7 +467,6 @@ static int lcdc_panel_off(struct platform_device *pdev)
 	}
 	
 	gpio_direction_output(panel_reset, 0);
-	//ZTE_LCD_LHT_20100521_001
 	gpio_direction_output(spi_sclk, 0);
 	gpio_direction_output(spi_sdi, 0);
 	gpio_direction_output(spi_sdo, 0);
@@ -499,9 +482,9 @@ static LCD_PANEL_TYPE lcd_panel_detect(void)
 void lcd_panel_init(void)
 {
 	gpio_direction_output(panel_reset, 1);
-	msleep(10);						////ZTE_LCD_LUYA_20100629_001
+	msleep(10);						
 	gpio_direction_output(panel_reset, 0);
-	msleep(50);						////ZTE_LCD_LUYA_20100629_001
+	msleep(50);						
 	gpio_direction_output(panel_reset, 1);
 	msleep(50);	
 	switch(g_lcd_panel_type)
@@ -562,7 +545,7 @@ static int  lcdc_panel_probe(struct platform_device *pdev)
 		switch(g_lcd_panel_type)
 		{
 			case LCD_PANEL_TRULY_HVGA:
-				LcdPanleID=(u32)110;   //ZTE_LCD_LHT_20100611_001
+				LcdPanleID=(u32)110;   
 				pinfo->clk_rate = 12288000;
 				ret = platform_device_register(&this_device);
 				break;

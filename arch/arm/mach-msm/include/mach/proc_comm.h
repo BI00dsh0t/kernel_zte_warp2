@@ -1,6 +1,6 @@
-/* arch/arm/mach-msm/proc_comm.h
+/* arch/arm/mach-msm/include/mach/proc_comm.h
  *
- * Copyright (c) 2007-2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2007-2009,2011 Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -138,6 +138,7 @@ enum {
 	PCOM_CLKCTL_RPC_SRC_REQUEST,
 	PCOM_NPA_INIT,
 	PCOM_NPA_ISSUE_REQUIRED_REQUEST,
+	PCOM_CLKCTL_RPC_SET_EXT_CONFIG,
 };
 
 enum {
@@ -168,7 +169,13 @@ enum {
 	PCOM_CMD_FAIL_PROC_COMM_NOT_INIT,
 };
 
+#ifdef CONFIG_MSM_PROC_COMM
 void msm_proc_comm_reset_modem_now(void);
 int msm_proc_comm(unsigned cmd, unsigned *data1, unsigned *data2);
+#else
+static inline void msm_proc_comm_reset_modem_now(void) { }
+static inline int msm_proc_comm(unsigned cmd, unsigned *data1, unsigned *data2)
+{ return 0; }
+#endif
 
 #endif

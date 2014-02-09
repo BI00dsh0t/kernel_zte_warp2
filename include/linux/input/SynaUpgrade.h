@@ -1820,7 +1820,7 @@ const unsigned char SynaFirmware[] = {
 /*70f0:*/ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0x24, 0x5d, 0xcf, 
 /*7100:*/ 0xFF }; 
 
-#elif defined(CONFIG_MACH_WARP2)
+#elif defined(CONFIG_MACH_WARP2) || defined (CONFIG_MACH_RADIANT)
 
 
 // This is Synaptics Image File Data - Auto-Generated - DO NOT EDIT!!! 

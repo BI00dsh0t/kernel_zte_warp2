@@ -29,6 +29,13 @@
 #define CMD_AUDIO_LP_END                0x9
 /* 2010-10-22 AUDIO_SSY_20102022 end */
 
+//lll054850 add for hide menu fens&widevoice
+#define CMD_DEVICE_FENS_ENABLE              0xA
+#define CMD_DEVICE_FENS_DISABLE              0xB
+#define CMD_DEVICE_WIDEVOICE_ENABLE         0xC
+#define CMD_DEVICE_WIDEVOICE_DISABLE              0xD
+
+
 /* EVENTS received from MODEM */
 #define EVENT_ACQUIRE_START             0x51
 #define EVENT_RELEASE_START             0x52

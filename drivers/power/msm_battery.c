@@ -1,4 +1,4 @@
-#if 0	 //zte'msm_battery.c for 8903 share_memory
+#if 0	 
 
 /* Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
@@ -220,6 +220,7 @@ static union rpc_reply_batt_chg rep_batt_chg;
 struct msm_battery_info {
 	u32 voltage_max_design;
 	u32 voltage_min_design;
+	u32 voltage_fail_safe;
 	u32 chg_api_version;
 	u32 batt_technology;
 	u32 batt_api_version;
@@ -568,9 +569,9 @@ static int msm_batt_get_batt_chg_status(void)
 		be32_to_cpu_self(v1p->battery_voltage);
 		be32_to_cpu_self(v1p->battery_temp);
 		
-                 #ifdef CONFIG_ZTE_PLATFORM//added by zhang.yu_1 for send battery temp and capacity when no charging @110813   	
-        	 	be32_to_cpu_self(v1p->batt_capacity);
-                 #endif		
+#ifdef CONFIG_ZTE_PLATFORM//added by zhang.yu_1 for send battery temp and capacity when no charging @110813   	
+        be32_to_cpu_self(v1p->batt_capacity);
+#endif		
 	} else {
 		pr_err("%s: No battery/charger data in RPC reply\n", __func__);
 		return -EIO;
@@ -586,7 +587,7 @@ static void msm_batt_update_psy_status(void)
 	u32	charger_type;
 	u32	battery_status;
 	u32	battery_level;
-	u32  battery_voltage;
+	u32     battery_voltage;
 	u32	battery_temp;
 	struct	power_supply	*supp;
 
@@ -965,8 +966,10 @@ void msm_batt_early_suspend(struct early_suspend *h)
 
 	if (msm_batt_info.batt_handle != INVALID_BATT_HANDLE) {
 		rc = msm_batt_modify_client(msm_batt_info.batt_handle,
-				BATTERY_LOW, BATTERY_VOLTAGE_BELOW_THIS_LEVEL,
-				BATTERY_CB_ID_LOW_VOL, BATTERY_LOW);
+				msm_batt_info.voltage_fail_safe,
+				BATTERY_VOLTAGE_BELOW_THIS_LEVEL,
+				BATTERY_CB_ID_LOW_VOL,
+				msm_batt_info.voltage_fail_safe);
 
 		if (rc < 0) {
 			pr_err("%s: msm_batt_modify_client. rc=%d\n",
@@ -991,8 +994,9 @@ void msm_batt_late_resume(struct early_suspend *h)
 
 	if (msm_batt_info.batt_handle != INVALID_BATT_HANDLE) {
 		rc = msm_batt_modify_client(msm_batt_info.batt_handle,
-				BATTERY_LOW, BATTERY_ALL_ACTIVITY,
-			       BATTERY_CB_ID_ALL_ACTIV, BATTERY_ALL_ACTIVITY);
+				msm_batt_info.voltage_fail_safe,
+				BATTERY_ALL_ACTIVITY,
+				BATTERY_CB_ID_ALL_ACTIV, BATTERY_ALL_ACTIVITY);
 		if (rc < 0) {
 			pr_err("%s: msm_batt_modify_client FAIL rc=%d\n",
 			       __func__, rc);
@@ -1640,6 +1644,8 @@ static int __devinit msm_batt_probe(struct platform_device *pdev)
 
 	msm_batt_info.voltage_max_design = pdata->voltage_max_design;
 	msm_batt_info.voltage_min_design = pdata->voltage_min_design;
+	msm_batt_info.voltage_fail_safe  = pdata->voltage_fail_safe;
+
 	msm_batt_info.batt_technology = pdata->batt_technology;
 	msm_batt_info.calculate_capacity = pdata->calculate_capacity;
 
@@ -1647,6 +1653,8 @@ static int __devinit msm_batt_probe(struct platform_device *pdev)
 		msm_batt_info.voltage_min_design = BATTERY_LOW;
 	if (!msm_batt_info.voltage_max_design)
 		msm_batt_info.voltage_max_design = BATTERY_HIGH;
+	if (!msm_batt_info.voltage_fail_safe)
+		msm_batt_info.voltage_fail_safe  = BATTERY_LOW;
 
 	if (msm_batt_info.batt_technology == POWER_SUPPLY_TECHNOLOGY_UNKNOWN)
 		msm_batt_info.batt_technology = POWER_SUPPLY_TECHNOLOGY_LION;
@@ -1664,8 +1672,10 @@ static int __devinit msm_batt_probe(struct platform_device *pdev)
 	msm_batt_info.msm_psy_batt = &msm_psy_batt;
 
 #ifndef CONFIG_BATTERY_MSM_FAKE
-	rc = msm_batt_register(BATTERY_LOW, BATTERY_ALL_ACTIVITY,
-			       BATTERY_CB_ID_ALL_ACTIV, BATTERY_ALL_ACTIVITY);
+	rc = msm_batt_register(msm_batt_info.voltage_fail_safe,
+			       BATTERY_ALL_ACTIVITY,
+			       BATTERY_CB_ID_ALL_ACTIV,
+			       BATTERY_ALL_ACTIVITY);
 	if (rc < 0) {
 		dev_err(&pdev->dev,
 			"%s: msm_batt_register failed rc = %d\n", __func__, rc);
@@ -1887,7 +1897,7 @@ MODULE_DESCRIPTION("Battery driver for Qualcomm MSM chipsets.");
 MODULE_VERSION("1.0");
 MODULE_ALIAS("platform:msm_battery");
 
-#else	//zte'msm_battery.c for 8903 share_memory
+#else	
 
 /*
  * this needs to be before <linux/kernel.h> is loaded,
@@ -1912,13 +1922,14 @@ MODULE_ALIAS("platform:msm_battery");
 #include <mach/msm_rpcrouter.h>
 #include <mach/msm_battery.h>
 
-#include <mach/zte_memlog.h>	/* zte_ccb add */
+#include <mach/zte_memlog.h>	
 #include <linux/io.h>
 
 #define BATTERY_LOW		3200
 #define BATTERY_HIGH		4300
 
 #define FEATURE_ZTE_APP_ENABLE_USB_CHARGING
+#define ZTE_PLATFORM_NOT_SHUTDOWN_WHILE_PERCENTAGE_0
 
 #if DEBUG
 #define DBG_LIMIT(x...) do {if (printk_ratelimit()) pr_debug(x); } while (0)
@@ -1926,7 +1937,7 @@ MODULE_ALIAS("platform:msm_battery");
 #define DBG_LIMIT(x...) do {} while (0)
 #endif
 
-#define ABSM(a,b)	  ((a)>(b)?((a)-(b)):((b)-(a)))	/* zte-ccb-20120208-2 */
+#define ABSM(a,b)	  ((a)>(b)?((a)-(b)):((b)-(a)))	
 
 #ifdef MSM_BATTERY_DEBUG
 #define DEBUG_MSM_BATTERY(fmt, args...)\
@@ -2064,6 +2075,7 @@ static void msm_batt_wait_for_batt_chg_event(struct work_struct *work);
 static DECLARE_WORK(msm_batt_cb_work, msm_batt_wait_for_batt_chg_event);
 
 static struct msm_battery_info msm_batt_info = {
+
 	.batt_handle = -1,
 	.charger_status = CHARGER_STATUS_BAD,
 	.charger_type = CHARGER_TYPE_INVALID,
@@ -2087,10 +2099,7 @@ static char *msm_power_supplied_to[] = {
 	"battery",
 };
 
-/*	zte-ccb-20120208-2
-static char *charger_st[] = {
-    "good", "bad", "weak", "invalid"
-};*/
+
 
 static char *charger_tp[] = {
     "no  chg", "   wall", "usb  pc", "usb wall", "usbcarkit",
@@ -2164,9 +2173,44 @@ static enum power_supply_property msm_batt_power_props[] = {
          #endif
 };
 
-static int shutdown_percentage_zero_enable = 1;
-module_param_named(zero_shutdown_enalbe, shutdown_percentage_zero_enable, int, S_IRUGO | S_IWUSR | S_IWGRP);
+#ifdef ZTE_PLATFORM_NOT_SHUTDOWN_WHILE_PERCENTAGE_0
+#define NOT_SHUTDOWN_PERCENTAGE_ZERO 0
+#define SHUTDOWN_PERCENTAGE_ZERO 1
+static int shutdown_percentage_zero_enable = SHUTDOWN_PERCENTAGE_ZERO;	/*0 not shutdown while percentage 0%,1 shutdown*/
 
+static ssize_t lowbattery_shutdown_show_enable(struct device_driver *driver, char *buf)
+{
+    printk("%s():line:%d %s to shutdown\n", __func__,__LINE__,shutdown_percentage_zero_enable?"enable":"forbid");
+    return snprintf(buf, PAGE_SIZE, "%s\n", shutdown_percentage_zero_enable?"enable":"forbid");
+}
+/*
+function:lowbattery_shutdown_store_enable
+usage:take disable for example,type "echo 0 > /sys/bus/platform/drivers/msm-battery/enable_to_shutdown"
+usage:take enable for example,type "echo 1 > /sys/bus/platform/drivers/msm-battery/enable_to_shutdown"
+
+*/
+static ssize_t lowbattery_shutdown_store_enable(struct device_driver *driver,
+                                  const char *buf, size_t count)
+{
+    char *p = (char *)buf;
+    unsigned int enable= 1;
+    enable=(unsigned int)simple_strtol(p, NULL, 10);
+
+    printk("%s():enter,get lowbattery_shutdown_enable:%d from \"%s\"\n", __func__,enable,buf);
+    if(enable==0 ||enable==1)
+    {
+        shutdown_percentage_zero_enable=enable;
+    }
+    else
+    {
+        printk("%s():get err lowbattery_shutdown_enable value:%d \n", __func__,enable);
+    }
+    printk("%s(): exit,line:%d\n", __func__,__LINE__);
+    return strnlen(buf, count);
+}
+
+static DRIVER_ATTR(enable_to_shutdown, S_IRWXUGO, lowbattery_shutdown_show_enable, lowbattery_shutdown_store_enable);	//can read write execute
+#endif
 
 #ifdef CONFIG_SCREEN_ON_WITHOUT_KEYOCDE
 
@@ -2234,15 +2278,12 @@ static struct power_supply msm_psy_batt = {
 };
 
 #ifdef FEATURE_ZTE_APP_ENABLE_USB_CHARGING
+#define FEATURE_ZTE_APP_ENABLE_USB_CHARGING_BY_SYS
 
 #define USB_CHG_DISABLE 0
 #define USB_CHG_ENABLE 1
 static int usb_charger_enable = USB_CHG_ENABLE;	
 static int usb_charger_enable_pre = USB_CHG_ENABLE;	
-
-//#include <mach/msm_rpcrouter.h>
-//#define CHG_RPC_PROG		0x3000001a
-//#define CHG_RPC_VERS		0x00010003
 
 //LHX_PM_20110601_01 change RPC prog and version for 8X55
 #define CHG_RPC_PROG			0x3000001A
@@ -2250,7 +2291,7 @@ static int usb_charger_enable_pre = USB_CHG_ENABLE;
 
 #define BATTERY_ENABLE_DISABLE_USB_CHG_PROC 		6
 
-module_param(usb_charger_enable, int, S_IRUGO | S_IWUSR | S_IWGRP);
+//module_param_named(usb_chg_enable, usb_charger_enable, int, S_IRUGO | S_IWUSR | S_IWGRP);	// set usb_chg_enable by/sys/module/msm_battery/parameters/usb_chg_enable
 
 /*--------------------------------------------------------------
 msm_batt_handle_control_usb_charging() is added according msm_chg_usb_charger_connected() in rpc_hsusb.c
@@ -2283,6 +2324,35 @@ static int msm_batt_handle_control_usb_charging(u32 usb_enable_disable)
 	return 0;
 }
 
+#endif
+#ifdef FEATURE_ZTE_APP_ENABLE_USB_CHARGING_BY_SYS//merged by zhang.yu_1 from gb7x27 @111221	
+static ssize_t zte_usb_chg_show_enable(struct device_driver *driver, char *buf)
+{
+    pr_debug("%s():line:%d %s usb to charger\n", __func__,__LINE__,usb_charger_enable?"enable":"forbid");
+    return snprintf(buf, PAGE_SIZE, "%s\n", usb_charger_enable?"enable":"forbid");
+}
+
+static ssize_t zte_usb_chg_store_enable(struct device_driver *driver,
+                                  const char *buf, size_t count)
+{
+    char *p = (char *)buf;
+    unsigned int enable= 1;
+    enable=(unsigned int)simple_strtol(p, NULL, 10);
+
+    pr_debug("%s():enter,get usb_charger_enable:%d from \"%s\"\n", __func__,enable,buf);
+    if(enable==0 ||enable==1)
+    {
+        usb_charger_enable=enable;
+    }
+    else
+    {
+        pr_err("%s():get err usb_charger_enable value:%d \n", __func__,enable);
+    }
+//    printk("%s(): exit,line:%d\n", __func__,__LINE__);
+    return strnlen(buf, count);
+}
+
+static DRIVER_ATTR(usb_chg_enable, S_IRWXUGO, zte_usb_chg_show_enable, zte_usb_chg_store_enable);	//can read write execute
 #endif
 
 static void msm_batt_update_psy_status(void)
@@ -2412,6 +2482,9 @@ static void msm_batt_update_psy_status(void)
 	         if ((rep_batt_chg.charger_type == CHARGER_TYPE_USB_WALL || 
 			 	rep_batt_chg.charger_type == CHARGER_TYPE_USB_PC))
 		{
+
+			if(rep_batt_chg.charging)
+			{
 				if(USB_CHG_DISABLE == usb_charger_enable)//if disabled usb charging, show  discharging
 				{
 			                	msm_batt_info.batt_status = POWER_SUPPLY_STATUS_DISCHARGING;
@@ -2420,7 +2493,11 @@ static void msm_batt_update_psy_status(void)
 				{
 			                	msm_batt_info.batt_status = POWER_SUPPLY_STATUS_CHARGING;
 				}
-				
+			}
+			else //after stop charging update batt_status
+			{
+				msm_batt_info.batt_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
+			}
 				#if 1		//LHX_PM_20110602_01 del charging to disable USB charger for 8903 charge.
 				if((usb_charger_enable_pre != usb_charger_enable)&&
 					((usb_charger_enable == USB_CHG_DISABLE)
@@ -2438,9 +2515,9 @@ static void msm_batt_update_psy_status(void)
 					msm_batt_handle_control_usb_charging(usb_charger_enable);
 				}
 		}
-		else if(rep_batt_chg.charger_type == CHARGER_TYPE_WALL)	//zte_ccb
+		else if(rep_batt_chg.charger_type == CHARGER_TYPE_WALL)	
 		{
-			if(rep_batt_chg.charging)	//zte_ccb
+			if(rep_batt_chg.charging)	
 				msm_batt_info.batt_status = POWER_SUPPLY_STATUS_CHARGING;
 			else
 				msm_batt_info.batt_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
@@ -2540,6 +2617,10 @@ static void msm_batt_update_psy_status(void)
     msm_batt_info.battery_level = rep_batt_chg.battery_level;
     msm_batt_info.battery_voltage = rep_batt_chg.battery_voltage;
     msm_batt_info.battery_capacity = rep_batt_chg.battery_capacity;
+#ifdef ZTE_PLATFORM_NOT_SHUTDOWN_WHILE_PERCENTAGE_0
+    if((0 == msm_batt_info.battery_capacity)&&(NOT_SHUTDOWN_PERCENTAGE_ZERO == shutdown_percentage_zero_enable))// percentage is 0% and not allow to shutdown,report 1% instead
+         msm_batt_info.battery_capacity++;
+#endif
     msm_batt_info.battery_temp = rep_batt_chg.battery_temp;
     msm_batt_info.chg_fulled = rep_batt_chg.chg_fulled;
     msm_batt_info.charging = rep_batt_chg.charging;
@@ -2783,6 +2864,29 @@ static int __init msm_batt_init(void)
 	
 #endif
 
+	#ifdef ZTE_PLATFORM_NOT_SHUTDOWN_WHILE_PERCENTAGE_0//merged by zhang.yu_1 from gb7x27 @111221
+         rc |= driver_create_file(&msm_batt_driver.driver, &driver_attr_enable_to_shutdown);
+         if (rc < 0)
+         {
+             pr_debug("%s: driver_create_file failed for enable_to_shutdown" "batt driver. rc = %d\n", __func__, rc);
+             pr_info("%s: driver_create_file failed for enable_to_shutdown" "batt driver. rc = %d\n", __func__, rc);
+             //return rc;
+         }
+         else
+         {
+             pr_debug("%s: driver_create_file success for enable_to_shutdown" "batt driver. rc = %d\n", __func__, rc);
+             pr_info("%s: driver_create_file success for enable_to_shutdown" "batt driver. rc = %d\n", __func__, rc);
+         }
+	#endif
+
+	#ifdef FEATURE_ZTE_APP_ENABLE_USB_CHARGING_BY_SYS//merged by zhang.yu_1 from gb7x27 @111221
+		rc |= driver_create_file(&msm_batt_driver.driver, &driver_attr_usb_chg_enable);
+		if (rc < 0)
+		{
+			pr_debug("%s: driver_create_file failed for usb_chg_enable " "batt driver. rc = %d\n", __func__, rc);
+			// return rc;
+		}
+	#endif
 	return 0;
 }
 

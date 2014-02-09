@@ -77,7 +77,7 @@ static const char ts_keys_size[] = "0x01:102:100:1061:200:74:0x01:139:300:1061:2
 static const char ts_keys_size[] = "0x01:102:60:850:100:50:0x01:139:180:850:100:50:0x01:158:300:850:100:50:0x01:217:420:850:100:50";
 #elif defined(CONFIG_MACH_SEAN)
 static const char ts_keys_size[] = "0x01:102:40:510:100:60:0x01:139:120:510:100:60:0x01:158:200:510:100:60:0x01:217:280:510:100:60";
-#elif defined(CONFIG_MACH_WARP2)
+#elif defined(CONFIG_MACH_WARP2)||defined(CONFIG_MACH_RADIANT) 
 /*ergate-003*/
 static const char ts_keys_size[] = "0x01:158:100:1024:100:60:0x01:102:270:1024:100:60:0x01:139:440:1024:100:60";
 #elif defined(CONFIG_MACH_SKATEPLUS)
@@ -741,7 +741,7 @@ static int synaptics_rmi4_probe(
 #if defined(CONFIG_MACH_SEAN)
 	max_y=1450;
 /*ergate-003*/
-#elif defined(CONFIG_MACH_WARP2)
+#elif defined(CONFIG_MACH_WARP2)||defined(CONFIG_MACH_RADIANT) 
 	max_y=1885;
 #else
 	max_y=ts->max[1];

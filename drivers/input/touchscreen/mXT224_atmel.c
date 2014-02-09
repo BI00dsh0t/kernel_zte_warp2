@@ -15,13 +15,7 @@
 /* ========================================================================================
 when            who       what, where, why                         		comment tag
 --------     ----       -------------------------------------    --------------------------
-2011-08-30   hjy        add the TOUCH_LONG_SLIDE function    TOUCH_LONG_SLIDE
-2011-04-25   zfj         add P732A driver code                      ZTE_TS_ZFJ_20110425
-2011-02-23   hjy         ATMEL 140 用在P727A20上       ZTE_HJY_CRDB00000000
-2010-12-14   wly         v9默认竖屏                                 ZTE_WLY_CRDB00586327
-2010-12-13   wly         v9＋默认竖屏                               ZTE_WLY_CRDB00586327
-2010-11-24   wly         解决手掌在屏上，睡眠唤醒后数据乱报问题     ZTE_WLY_CRDB00577718
-2010-10-25   wly         update report data format                  ZTE_WLY_CRDB00517999
+
 ========================================================================================*/
 #include <linux/module.h>
 #include <linux/input.h>
@@ -265,7 +259,6 @@ uint8_t get_report_ids_size(struct atmel_ts_data *ts, uint8_t object_type)
 }
 
 #ifdef ATMEL_EN_SYSFS
-//huangjinyu ZTE_TS_HUANGJINYU_20110223 BEGIN
 #if defined (CONFIG_MACH_MOONCAKE )
 static const char ts_keys_size[] = "0x01:102:40:350:50:15:0x01:158:200:350:50:15";
 #elif defined (CONFIG_MACH_V9PLUS)
@@ -275,12 +268,11 @@ static const char ts_keys_size[] =
 "0x01:139:60:845:80:30:0x01:102:180:845:80:30:0x01:158:300:845:80:30:0x01:217:420:845:80:30";
 #elif defined(CONFIG_MACH_SEAN)
 static const char ts_keys_size[] = "0x01:102:36:515:40:20:0x01:139:120:515:40:20:0x01:158:204:515:40:20:0x01:217:286:515:40:20";
-#elif defined(CONFIG_MACH_WARP2)
+#elif defined(CONFIG_MACH_WARP2) || defined (CONFIG_MACH_RADIANT)
 static const char ts_keys_size[] = "0x01:102:36:515:40:20:0x01:139:120:515:40:20:0x01:158:204:515:40:20:0x01:217:286:515:40:20";
 #else
 static const char ts_keys_size[] = "0x01:102:80:810:100:10:0x01:139:240:810:100:10:0x01:158:400:810:100:10";
 #endif
-//huangjinyu ZTE_TS_HUANGJINYU_20110223 END
 static ssize_t atmel_virtualkeys_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1341,7 +1333,6 @@ void virtual_keys(struct atmel_ts_data *ts, uint8_t key_code, uint8_t key_state,
 	//printk("huangjinyu v-key coming data[2] = %d \n",data[2]);
 if(!ts->finger_count){
 			key_state = !!(data[1]& 0x80);
-      //huangjinyu ZTE_TS_HUANGJINYU_20110223 BEGIN
       #if defined(CONFIG_MACH_MOONCAKE)
 			switch(data[2])
 			{
@@ -1356,7 +1347,6 @@ if(!ts->finger_count){
 				default:
 				break;
 			}
-	/*ZTE_TS_ZFJ_20110425 begin*/
 	  #elif defined(CONFIG_MACH_NOVA)
 			switch(data[2])
 			{
@@ -1379,7 +1369,6 @@ if(!ts->finger_count){
 				default:
 				break;
 			}
-	/*ZTE_TS_ZFJ_20110425 end*/
       #else
 			switch(data[2])
 			{
@@ -1417,7 +1406,6 @@ if(!ts->finger_count){
 			}
 			#endif
 	  #endif
-      //huangjinyu ZTE_TS_HUANGJINYU_20110223 end
 			if (!key_state)
 			{
 				ts->finger_data[0].w = 0;
@@ -1428,17 +1416,13 @@ if(!ts->finger_count){
 				ts->finger_data[0].w = 10;
 				ts->finger_data[0].z = 255;
 			}
-      //huangjinyu ZTE_TS_HUANGJINYU_20110223 BEGIN
       #if defined(CONFIG_MACH_MOONCAKE) 
 			ts->finger_data[0].y = 350;
-      /*ZTE_TS_ZFJ_20110425 begin*/
 	  #elif defined(CONFIG_MACH_NOVA)
 			ts->finger_data[0].y = 520;
-	  /*ZTE_TS_ZFJ_20110425 end*/
       #else
 			ts->finger_data[0].y = 810;
 	  #endif
-	  //huangjinyu ZTE_TS_HUANGJINYU_20110223 end
 			input_report_key(ts->input_dev, BTN_TOUCH, !!key_state);
 			input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR,ts->finger_data[0].z);
 			input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR,ts->finger_data[0].w);
@@ -2276,7 +2260,7 @@ static int atmel_ts_probe(struct i2c_client *client,
 	uint8_t loop_i;
 	uint8_t data[16];
 	uint8_t CRC_check = 0;
-	struct proc_dir_entry *dir, *refresh;//ZTE_WLY_CRDB00509514	
+	struct proc_dir_entry *dir, *refresh;
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		printk(KERN_ERR"%s: need I2C_FUNC_I2C\n", __func__);
 		ret = -ENODEV;
@@ -2309,12 +2293,10 @@ static int atmel_ts_probe(struct i2c_client *client,
 		ts->power = pdata->power;
 		intr = pdata->gpio_irq;
 	}
-	//huangjinyu ZTE_TS_HJY_20110223 BEGIN
 	else
 	{
 		printk(KERN_WARNING"atmel ts:there is no platform_data!\n");
 	}
-	//huangjinyu ZTE_TS_HJY_20110223 END
 	if (ts->power) {
 		ret = ts->power(1);
 		msleep(200);
@@ -2606,17 +2588,13 @@ static int atmel_ts_probe(struct i2c_client *client,
 
 	private_ts = ts;
 
-/*ZTE_TOUCH_WLY_008,@2010-01-19,begin*/
-//ZTE_WLY_CRDB00509514,BEGIN
   dir = proc_mkdir("touchscreen", NULL);
 	refresh = create_proc_entry("ts_information", 0777, dir);
-//ZTE_WLY_CRDB00509514,END
 	if (refresh) {
 		refresh->data		= NULL;
 		refresh->read_proc  = proc_read_val;
 		refresh->write_proc = proc_write_val;
 	}
-/*ZTE_TOUCH_WLY_008,@2010-01-19,end*/
 
 #ifdef ATMEL_EN_SYSFS
 	atmel_touch_sysfs_init();

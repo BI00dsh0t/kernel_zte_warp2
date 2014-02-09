@@ -39,6 +39,7 @@
 #define TOUCH_KEYSET_T31                          31u
 #define TOUCH_XSLIDERSET_T32                      32u
 #define DIAGNOSTIC_T37			37u
+#define T64                     64u
 struct info_id_t {
 	uint8_t family_id;
 	uint8_t variant_id;
@@ -77,7 +78,8 @@ struct atmel_platform_data {
 	int (*gpio_init)(int on);
 	void (*power)(int on);
 	void (*reset)(int hl);
-	void (*irq)(int hl,bool io);
+	//void (*irq)(bool wake);
+	void (*irq)( int hl, bool io_flag );
 	char  fwfile[64];	// firmware file name
 };
 
@@ -110,11 +112,12 @@ struct atmel_config_data {
 	int8_t config_T25[14];
 	int8_t config_T27[7];
 	int8_t config_T28[6];
+	int8_t config_T64[7];
 #ifdef CONFIG_TS_NOTIFIER
 	int8_t config_T9_charge[4];
 	int8_t config_T28_charge[2];
 #endif
-	uint8_t object_crc[3];
+	uint8_t object_crc[6];
 	int8_t cable_config[4];
 	int8_t cable_config_T7[3];
 	int8_t cable_config_T8[8];

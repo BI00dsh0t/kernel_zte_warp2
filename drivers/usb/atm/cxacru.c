@@ -1290,7 +1290,7 @@ static const struct usb_device_id cxacru_usb_ids[] = {
 	{ /* V = Conexant			P = ADSL modem				*/
 		USB_DEVICE(0x0572, 0xcb06),	.driver_info = (unsigned long) &cxacru_cb00
 	},
-	{ /* V = Conexant			P = ADSL modem (ZTE ZXDSL 852)		*/
+	{ /* V = Conexant			P = ADSL modem		*/
 		USB_DEVICE(0x0572, 0xcb07),	.driver_info = (unsigned long) &cxacru_cb00
 	},
 	{ /* V = Olitec				P = ADSL modem version 2		*/
@@ -1372,18 +1372,7 @@ static struct usb_driver cxacru_usb_driver = {
 	.id_table	= cxacru_usb_ids
 };
 
-static int __init cxacru_init(void)
-{
-	return usb_register(&cxacru_usb_driver);
-}
-
-static void __exit cxacru_cleanup(void)
-{
-	usb_deregister(&cxacru_usb_driver);
-}
-
-module_init(cxacru_init);
-module_exit(cxacru_cleanup);
+module_usb_driver(cxacru_usb_driver);
 
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);

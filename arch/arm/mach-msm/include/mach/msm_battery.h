@@ -21,11 +21,13 @@
 struct msm_psy_batt_pdata {
 	u32 voltage_max_design;
 	u32 voltage_min_design;
+	u32 voltage_fail_safe;
 	u32 avail_chg_sources;
 	u32 batt_technology;
 	u32 (*calculate_capacity)(u32 voltage);
 };
 
+//YINTIANCI_BAT_20101101 begin
 struct __attribute__((packed)) smem_batt_chg_t
 {
 	u8 charger_type;
@@ -38,11 +40,12 @@ struct __attribute__((packed)) smem_batt_chg_t
 	s16 battery_temp;
 	u8 battery_capacity;
 			
-	u8 curr_capacity;
+	u8 curr_capacity;	
 	u8 curr_temp;
 	u8 temp_data;
 	u16 curr_voltage;
 };
 
+//YINTIANCI_BAT_20101101 end
 
 #endif

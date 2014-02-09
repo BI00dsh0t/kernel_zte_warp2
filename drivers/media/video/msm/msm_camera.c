@@ -35,6 +35,7 @@
 #include <linux/syscalls.h>
 #include <linux/hrtimer.h>
 #include <linux/ion.h>
+#include <mach/cpuidle.h>
 DEFINE_MUTEX(ctrl_cmd_lock);
 
 #define CAMERA_STOP_VIDEO 58
@@ -312,7 +313,7 @@ static int msm_pmem_table_add(struct hlist_head *ptype,
 	if (!region)
 		goto out;
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-		region->handle = ion_import_fd(client_for_ion, info->fd);
+		region->handle = ion_import_dma_buf(client_for_ion, info->fd);
 		if (IS_ERR_OR_NULL(region->handle))
 			goto out1;
 		ion_phys(client_for_ion, region->handle,
@@ -2872,7 +2873,7 @@ static long msm_ioctl_config(struct file *filep, unsigned int cmd,
 			rc = -EFAULT;
 		} else {
 			CDBG("msm_strobe_flash_init enter");
-			//rc = msm_strobe_flash_init(pmsm->sync, flash_type);
+			rc = msm_strobe_flash_init(pmsm->sync, flash_type);
 		}
 		break;
 	}
@@ -2903,7 +2904,7 @@ static long msm_ioctl_config(struct file *filep, unsigned int cmd,
 			ERR_COPY_FROM_USER();
 			rc = -EFAULT;
 		} else
-			//rc = msm_flash_ctrl(pmsm->sync->sdata, &flash_info);
+			rc = msm_flash_ctrl(pmsm->sync->sdata, &flash_info);
 
 		break;
 	}
@@ -2922,44 +2923,7 @@ static long msm_ioctl_config(struct file *filep, unsigned int cmd,
 		rc = 0;
 		break;
 	}
-    /*
-      * Commented by YGL_CAM_20100605 ZTE_CAM_WT_20110221
-      * Added for turning on/off flash LED,
-      * called by vfe_process_QDSP_VFETASK_MSG_VFE_RESET_ACK in HAL
-      */
-	case MSM_CAM_IOCTL_FLASH_LED_ON_OFF_CFG: {
-        uint32_t flashled_switch;
 
-        if (copy_from_user(&flashled_switch, argp, sizeof(flashled_switch))) {
-            ERR_COPY_FROM_USER();
-            rc = -EFAULT;
-        } else {
-        	pr_err("msm_ioctl_config:MSM_CAM_IOCTL_FLASH_LED_ON_OFF_CFG,flashled_switch=%d\n",flashled_switch);
-
-            if (0 == flashled_switch) {
-                rc = msm_camera_flash_led_disable();
-            }
-            else {
-                rc = msm_camera_flash_led_enable();
-            }
-        }
-        break;	
-    }
-
-	/*
-	  * add Auto mode for flash LED, ZTE_CAM_LJ_20120616
-	  */ 
-	case MSM_CAM_IOCTL_FLASH_LED_MODE_CFG: {
-		uint32_t led_mode;
-		if (copy_from_user(&led_mode, argp, sizeof(led_mode))) {
-			ERR_COPY_FROM_USER();
-			rc = -EFAULT;
-		} else
-			rc = msm_camera_flash_set_led_mode(pmsm->sync->
-					sdata->flash_data, led_mode);
-		break;
-	}
- 
 	default:
 		rc = msm_ioctl_common(pmsm, cmd, argp);
 		break;
@@ -3121,7 +3085,7 @@ static int __msm_release(struct msm_sync *sync)
 		msm_queue_drain(&sync->pict_q, list_pict);
 		msm_queue_drain(&sync->event_q, list_config);
 
-		wake_unlock(&sync->wake_lock);
+		pm_qos_update_request(&sync->idle_pm_qos, PM_QOS_DEFAULT_VALUE);
 		sync->apps_id = NULL;
 		sync->core_powered_on = 0;
 	}
@@ -3781,7 +3745,8 @@ static int __msm_open(struct msm_cam_device *pmsm, const char *const apps_id,
 	sync->apps_id = apps_id;
 
 	if (!sync->core_powered_on && !is_controlnode) {
-		wake_lock(&sync->wake_lock);
+		pm_qos_update_request(&sync->idle_pm_qos,
+			msm_cpuidle_get_deep_idle_latency());
 
 		msm_camvfe_fn_init(&sync->vfefn, sync);
 		if (sync->vfefn.vfe_init) {
@@ -3995,11 +3960,12 @@ static int msm_sync_init(struct msm_sync *sync,
 	msm_queue_init(&sync->pict_q, "pict");
 	msm_queue_init(&sync->vpe_q, "vpe");
 
-	wake_lock_init(&sync->wake_lock, WAKE_LOCK_IDLE, "msm_camera");
+	pm_qos_add_request(&sync->idle_pm_qos, PM_QOS_CPU_DMA_LATENCY,
+		PM_QOS_DEFAULT_VALUE);
 
 	rc = msm_camio_probe_on(pdev);
 	if (rc < 0) {
-		wake_lock_destroy(&sync->wake_lock);
+		pm_qos_remove_request(&sync->idle_pm_qos);
 		return rc;
 	}
 	rc = sensor_probe(sync->sdata, &sctrl);
@@ -4012,7 +3978,7 @@ static int msm_sync_init(struct msm_sync *sync,
 		pr_err("%s: failed to initialize %s\n",
 			__func__,
 			sync->sdata->sensor_name);
-		wake_lock_destroy(&sync->wake_lock);
+		pm_qos_remove_request(&sync->idle_pm_qos);
 		return rc;
 	}
 
@@ -4031,7 +3997,7 @@ static int msm_sync_init(struct msm_sync *sync,
 
 static int msm_sync_destroy(struct msm_sync *sync)
 {
-	wake_lock_destroy(&sync->wake_lock);
+	pm_qos_remove_request(&sync->idle_pm_qos);
 	return 0;
 }
 
@@ -4097,15 +4063,7 @@ static int msm_device_init(struct msm_cam_device *pmsm,
 
 	return rc;
 }
-/*
- * modify for two cameras
- * ZTE_CAM_LJ_20110324
- */
-/*
- * ZTE_CAMERA_LJ_20111121
- * add camera adapter for v9plus
- */
-DEFINE_SEMAPHORE(msm_camera_sensor_init_sem);
+
 int msm_camera_drv_start(struct platform_device *dev,
 		int (*sensor_probe)(const struct msm_camera_sensor_info *,
 			struct msm_sensor_ctrl *))
@@ -4113,13 +4071,10 @@ int msm_camera_drv_start(struct platform_device *dev,
 	struct msm_cam_device *pmsm = NULL;
 	struct msm_sync *sync;
 	int rc = -ENODEV;
-    CDBG("%s:entry",__func__);
-    down(&msm_camera_sensor_init_sem);
-    CDBG("%s:init sensors",__func__);
+
 	if (camera_node >= MSM_MAX_CAMERA_SENSORS) {
 		pr_err("%s: too many camera sensors\n", __func__);
-        goto drv_start_failed;
-		//return rc;
+		return rc;
 	}
 
 	if (!msm_class) {
@@ -4130,8 +4085,7 @@ int msm_camera_drv_start(struct platform_device *dev,
 		if (rc < 0) {
 			pr_err("%s: failed to allocate chrdev: %d\n", __func__,
 				rc);
-            goto drv_start_failed;
-			//return rc;
+			return rc;
 		}
 
 		msm_class = class_create(THIS_MODULE, "msm_camera");
@@ -4139,25 +4093,20 @@ int msm_camera_drv_start(struct platform_device *dev,
 			rc = PTR_ERR(msm_class);
 			pr_err("%s: create device class failed: %d\n",
 				__func__, rc);
-            goto drv_start_failed;
-			//return rc;
+			return rc;
 		}
 	}
 
 	pmsm = kzalloc(sizeof(struct msm_cam_device) * 4 +
 			sizeof(struct msm_sync), GFP_ATOMIC);
-	if (!pmsm) {
-        rc = -ENOMEM;
-        goto drv_start_failed;
-		//return -ENOMEM;
-       }
+	if (!pmsm)
+		return -ENOMEM;
 	sync = (struct msm_sync *)(pmsm + 4);
 
 	rc = msm_sync_init(sync, dev, sensor_probe);
 	if (rc < 0) {
 		kfree(pmsm);
-        goto drv_start_failed;
-		//return rc;
+		return rc;
 	}
 
 	CDBG("%s: setting camera node %d\n", __func__, camera_node);
@@ -4165,8 +4114,7 @@ int msm_camera_drv_start(struct platform_device *dev,
 	if (rc < 0) {
 		msm_sync_destroy(sync);
 		kfree(pmsm);
-        goto drv_start_failed;
-		//return rc;
+		return rc;
 	}
 
 	camera_type[camera_node] = sync->sctrl.s_camera_type;
@@ -4174,9 +4122,6 @@ int msm_camera_drv_start(struct platform_device *dev,
 	camera_node++;
 
 	list_add(&sync->list, &msm_sensors);
-drv_start_failed:
-    up(&msm_camera_sensor_init_sem);
-    CDBG("%s:exit",__func__);
 	return rc;
 }
 EXPORT_SYMBOL(msm_camera_drv_start);

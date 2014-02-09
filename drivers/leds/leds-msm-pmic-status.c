@@ -18,6 +18,7 @@
 /*===========================================================================
 						 INCLUDE FILES FOR MODULE
 ===========================================================================*/
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
@@ -27,6 +28,7 @@
 #include <linux/sched.h>
 #include <mach/pmic.h>
 #include <linux/slab.h>
+#include <linux/export.h>
 
 /*=========================================================================*/
 /*                                MACROS                                   */
@@ -89,7 +91,7 @@ static int pmic_set_led_hal(enum ledtype type, int level)
 static void pmic_red_led_on(struct work_struct *work)
 {
 	struct BLINK_LED_data *b_led = container_of(work, struct BLINK_LED_data, work_led_on);
-	pmic_set_led_hal(LED_KEYPAD, b_led->led.brightness / MAX_PMIC_BL_LEVEL);
+	pmic_set_led_hal(LED_KEYPAD, b_led->led.brightness /*/ MAX_PMIC_BL_LEVEL*/);
 }
 
 static void pmic_red_led_off(struct work_struct *work)
@@ -100,7 +102,7 @@ static void pmic_red_led_off(struct work_struct *work)
 static void pmic_green_led_on(struct work_struct *work)
 {
        	struct BLINK_LED_data *b_led = container_of(work, struct BLINK_LED_data, work_led_on);
-	pmic_set_led_hal(LED_LCD, b_led->led.brightness / MAX_PMIC_BL_LEVEL);
+	pmic_set_led_hal(LED_LCD, b_led->led.brightness /*/ MAX_PMIC_BL_LEVEL*/);
 }
 
 static void pmic_green_led_off(struct work_struct *work)
@@ -123,9 +125,9 @@ static void msm_pmic_bl_led_set(struct led_classdev *led_cdev,
 	LED_INFO(" set %s = %d.", led_cdev->name ,value);
 
 	if (!strcmp(led_cdev->name, "red")) {
-		ret = pmic_set_led_hal(LED_KEYPAD, value / MAX_PMIC_BL_LEVEL);
+		ret = pmic_set_led_hal(LED_KEYPAD, value /*/ MAX_PMIC_BL_LEVEL*/);
 	} else {
-		ret = pmic_set_led_hal(LED_LCD, value / MAX_PMIC_BL_LEVEL);
+		ret = pmic_set_led_hal(LED_LCD, value/* / MAX_PMIC_BL_LEVEL*/);
 	}
 	
 	if (ret)
@@ -465,7 +467,7 @@ static int __devexit msm_pmic_led_remove(struct platform_device *pdev)
 #define CONFIG_ZTE_NLED_BLINK_WHILE_APP_SUSPEND
 #endif
 #ifdef CONFIG_ZTE_NLED_BLINK_WHILE_APP_SUSPEND
-#include "../../arch/arm/mach-msm/proc_comm.h"
+#include <mach/proc_comm.h>
 #define NLED_APP2SLEEP_FLAG_LCD 0x0001//green
 #define NLED_APP2SLEEP_FLAG_LCD_BLINK 0x0002//green blink flag
 
@@ -537,7 +539,6 @@ static int msm_pmic_led_resume(struct platform_device *dev)
 	led_not_suspend_flag = 1;	//ccb add
 	
 #ifdef CONFIG_ZTE_NLED_BLINK_WHILE_APP_SUSPEND
-	//msm_pmic_led_config_while_app2sleep( 0, 0, 0, 0, ZTE_PROC_COMM_CMD3_NLED_BLINK_DISABLE);	//chenchongbao.20111209 no need
 #endif
 
        	for (i = 0; i < 2; i++)

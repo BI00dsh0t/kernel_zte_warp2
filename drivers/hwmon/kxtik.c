@@ -513,8 +513,12 @@ static int __devinit kxtik_verify(struct kxtik_data *tik)
 	if (retval < 0)
 		dev_err(&tik->client->dev, "error reading WHO_AM_I register!\n");
 	else
-		retval = retval != 0x05 ? -EIO : 0;
+#ifdef CONFIG_SENSORS_KXTIK1013 
 
+		retval = retval != 0x11 ? -EIO : 0;
+#else				
+		retval = retval != 0x05 ? -EIO : 0;
+#endif		
 	return retval;
 }
 

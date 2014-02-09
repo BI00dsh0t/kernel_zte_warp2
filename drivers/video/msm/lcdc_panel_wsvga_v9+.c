@@ -18,7 +18,6 @@
 /* ========================================================================================
 when         who        what, where, why                                  comment tag
 --------     ----       -----------------------------                --------------------------
-2011-04-19   luya		modify for BKL abnormal when wakeup	CRDB00639193	ZTE_LCD_LUYA_20110419_001
 ==========================================================================================*/
 
 
@@ -32,7 +31,7 @@ when         who        what, where, why                                  commen
 
 #define LCD_BL_LEVEL 32
 
-static bool onewiremode = TRUE;		////ZTE_LCD_LUYA_20110419_001
+static bool onewiremode = TRUE;
 
 static int lcd_avdd;
 static int lcd_pwr_en;
@@ -80,9 +79,9 @@ static void select_1wire_mode(void)
 	gpio_direction_output(GPIO_LCD_BL_SC_OUT, 1);
 	udelay(120);
 	gpio_direction_output(GPIO_LCD_BL_SC_OUT, 0);
-	udelay(280);				////ZTE_LCD_LUYA_20100226_001ZTE_LCD_LUYA_20110419_001
+	udelay(280);
 	gpio_direction_output(GPIO_LCD_BL_SC_OUT, 1);
-	udelay(650);				////ZTE_LCD_LUYA_20100226_001ZTE_LCD_LUYA_20110419_001
+	udelay(650);
 	
 }
 
@@ -175,7 +174,6 @@ static void lcdc_set_bl(struct msm_fb_data_type *mfd)
         current_lel = 32;
     }
 
-    /*ZTE_BACKLIGHT_WLY_005,@2009-11-28, set backlight as 32 levels, end*/
     if(current_lel==0)
     	{
     		gpio_direction_output(GPIO_LCD_BL_SC_OUT, 0);
@@ -185,9 +183,9 @@ static void lcdc_set_bl(struct msm_fb_data_type *mfd)
     	}
     else 
 	{
-		if(!onewiremode)	//select 1 wire modeZTE_LCD_LUYA_20100226_001
+		if(!onewiremode)
 		{
-			msleep(100);			////ZTE_LCD_LUYA_20101113_001
+			msleep(100);
 		}
 
   		local_irq_save(flags);
@@ -260,7 +258,7 @@ static int __devinit lcdc_panel_probe(struct platform_device *pdev)
 		lcdc_v9_pdata = pdev->dev.platform_data;
 		lcdc_v9_pdata->panel_config_gpio(1);
 	
-	 	LcdPanleID=(u32)LCD_PANEL_V9PLUS_NT39411B;   //ZTE_LCD_LHT_20100611_001
+	 	LcdPanleID=(u32)LCD_PANEL_V9PLUS_NT39411B;
 		return 0;
 	}
 	msm_fb_add_device(pdev);

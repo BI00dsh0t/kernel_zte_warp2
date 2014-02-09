@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2007-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2007-2012, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -16,6 +16,7 @@
 
 #include <linux/version.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/string.h>
@@ -25,6 +26,7 @@
 #include <linux/mutex.h>
 #include <linux/io.h>
 #include <linux/sort.h>
+#include <linux/platform_device.h>
 #include <mach/board.h>
 #include <mach/msm_iomap.h>
 #include <asm/mach-types.h>
@@ -34,8 +36,8 @@
 #include "acpuclock.h"
 #include "spm.h"
 
-#define SCSS_CLK_CTL_ADDR	(MSM_ACC_BASE + 0x04)
-#define SCSS_CLK_SEL_ADDR	(MSM_ACC_BASE + 0x08)
+#define SCSS_CLK_CTL_ADDR	(MSM_ACC0_BASE + 0x04)
+#define SCSS_CLK_SEL_ADDR	(MSM_ACC0_BASE + 0x08)
 
 #define PLL2_L_VAL_ADDR		(MSM_CLK_CTL_BASE + 0x33C)
 #define PLL2_M_VAL_ADDR		(MSM_CLK_CTL_BASE + 0x340)
@@ -52,7 +54,6 @@
 #define VDD_RAW(mv) (((MV(mv) / V_STEP) - 30) | VREG_DATA)
 
 #define MAX_AXI_KHZ 192000
-
 
 struct clock_state {
 	struct clkctl_acpu_speed	*current_speed;
@@ -121,11 +122,11 @@ static struct clk *acpuclk_sources[MAX_SOURCE];
  */
 static struct clkctl_acpu_speed acpu_freq_tbl[] = {
 	{ 0, 24576, LPXO, 0, 0,  30720000,  900, VDD_RAW(900) },
-	{ 0, 61440,   PLL_3, 5, 11, 61440000,  900, VDD_RAW(900) },
-	{ 1, 122880,  PLL_3, 5, 5,  61440000,  900, VDD_RAW(900) },
-	{ 0, 184320,  PLL_3, 5, 4,  61440000,  900, VDD_RAW(900) },
-	{ 0, MAX_AXI_KHZ, AXI, 1, 0, 61440000, 900, VDD_RAW(900) },
-	{ 1, 245760,  PLL_3, 5, 2,  61440000,  900, VDD_RAW(900) },
+	{ 1, 61440,   PLL_3, 5, 11, 61440000,  750, VDD_RAW(750) },
+	{ 1, 122880,  PLL_3, 5, 5,  61440000,  800, VDD_RAW(800) },
+	{ 0, 184320,  PLL_3, 5, 4,  61440000,  800, VDD_RAW(800) },
+	{ 0, MAX_AXI_KHZ, AXI, 1, 0, 61440000, 850, VDD_RAW(850) },
+	{ 1, 245760,  PLL_3, 5, 2,  61440000,  850, VDD_RAW(850) },
 	{ 1, 368640,  PLL_3, 5, 1,  122800000, 900, VDD_RAW(900) },
 	{ 0, 460800,  PLL_1, 2, 0,  153600000, 900, VDD_RAW(900) },
 	{ 0, 576000,  PLL_1, 2, 0,  153600000, 950, VDD_RAW(950) },
@@ -134,17 +135,17 @@ static struct clkctl_acpu_speed acpu_freq_tbl[] = {
 	/*
 	 * AXI has MSMC1 implications. See above.
 	 */
-	{ 1, 806400,  PLL_2, 3, 0, UINT_MAX, 1000, VDD_RAW(1000), &pll2_tbl[0]},
-	{ 1, 921600,  PLL_2, 3, 0, UINT_MAX, 1000, VDD_RAW(1000), &pll2_tbl[1]},
-	{ 1, 1024000, PLL_2, 3, 0, UINT_MAX, 1000, VDD_RAW(1000), &pll2_tbl[2]},
-	{ 0, 1113000, PLL_2, 3, 0, UINT_MAX, 1050, VDD_RAW(1050), &pll2_tbl[3]},
-	{ 1, 1209600, PLL_2, 3, 0, UINT_MAX, 1100, VDD_RAW(1100), &pll2_tbl[4]},
-	{ 0, 1305600, PLL_2, 3, 0, UINT_MAX, 1150, VDD_RAW(1150), &pll2_tbl[5]},
-	{ 1, 1401600, PLL_2, 3, 0, UINT_MAX, 1200, VDD_RAW(1200), &pll2_tbl[6]},
-	{ 1, 1516800, PLL_2, 3, 0, UINT_MAX, 1250, VDD_RAW(1250), &pll2_tbl[7]},
-	{ 1, 1612800, PLL_2, 3, 0, UINT_MAX, 1350, VDD_RAW(1350), &pll2_tbl[8]},
-	{ 1, 1708800, PLL_2, 3, 0, UINT_MAX, 1400, VDD_RAW(1400), &pll2_tbl[9]},
-	{ 1, 1804800, PLL_2, 3, 0, UINT_MAX, 1450, VDD_RAW(1450), &pll2_tbl[10]},
+	{ 1, 806400,  PLL_2, 3, 0, UINT_MAX, 950, VDD_RAW(950), &pll2_tbl[0]},
+	{ 1, 921600,  PLL_2, 3, 0, UINT_MAX, 950, VDD_RAW(950), &pll2_tbl[1]},
+	{ 1, 1024000, PLL_2, 3, 0, UINT_MAX, 950, VDD_RAW(950), &pll2_tbl[2]},
+	{ 0, 1113000, PLL_2, 3, 0, UINT_MAX, 1000, VDD_RAW(1000), &pll2_tbl[3]},
+	{ 1, 1209600, PLL_2, 3, 0, UINT_MAX, 1000, VDD_RAW(1000), &pll2_tbl[4]},
+	{ 0, 1305600, PLL_2, 3, 0, UINT_MAX, 1050, VDD_RAW(1050), &pll2_tbl[5]},
+	{ 1, 1401600, PLL_2, 3, 0, UINT_MAX, 1100, VDD_RAW(1100), &pll2_tbl[6]},
+	{ 1, 1516800, PLL_2, 3, 0, UINT_MAX, 1200, VDD_RAW(1200), &pll2_tbl[7]},
+	{ 1, 1612800, PLL_2, 3, 0, UINT_MAX, 1275, VDD_RAW(1275), &pll2_tbl[8]},
+	{ 1, 1708800, PLL_2, 3, 0, UINT_MAX, 1325, VDD_RAW(1325), &pll2_tbl[9]},
+	{ 1, 1804800, PLL_2, 3, 0, UINT_MAX, 1375, VDD_RAW(1375), &pll2_tbl[10]},
 	{ 0 }
 };
 
@@ -332,7 +333,7 @@ static unsigned long acpuclk_7x30_get_rate(int cpu)
  * Clock driver initialization
  *---------------------------------------------------------------------------*/
 
-static void __init acpuclk_hw_init(void)
+static void __devinit acpuclk_hw_init(void)
 {
 	struct clkctl_acpu_speed *s;
 	uint32_t div, sel, src_num;
@@ -410,7 +411,7 @@ static void __init acpuclk_hw_init(void)
 }
 
 /* Initalize the lpj field in the acpu_freq_tbl. */
-static void __init lpj_init(void)
+static void __devinit lpj_init(void)
 {
 	int i;
 	const struct clkctl_acpu_speed *base_clk = drv_state.current_speed;
@@ -448,7 +449,7 @@ static inline void setup_cpufreq_table(void) { }
  * Truncate the frequency table at the current PLL2 rate and determine the
  * backup PLL to use when scaling PLL2.
  */
-void __init pll2_fixup(void)
+void __devinit pll2_fixup(void)
 {
 	struct clkctl_acpu_speed *speed = acpu_freq_tbl;
 	u8 pll2_l = readl_relaxed(PLL2_L_VAL_ADDR) & 0xFF;
@@ -470,7 +471,7 @@ void __init pll2_fixup(void)
 #define RPM_BYPASS_MASK	(1 << 3)
 #define PMIC_MODE_MASK	(1 << 4)
 
-static void __init populate_plls(void)
+static void __devinit populate_plls(void)
 {
 	acpuclk_sources[PLL_1] = clk_get_sys("acpu", "pll1_clk");
 	BUG_ON(IS_ERR(acpuclk_sources[PLL_1]));
@@ -478,6 +479,14 @@ static void __init populate_plls(void)
 	BUG_ON(IS_ERR(acpuclk_sources[PLL_2]));
 	acpuclk_sources[PLL_3] = clk_get_sys("acpu", "pll3_clk");
 	BUG_ON(IS_ERR(acpuclk_sources[PLL_3]));
+	/*
+	 * Prepare all the PLLs because we enable/disable them
+	 * from atomic context and can't always ensure they're
+	 * all prepared in non-atomic context.
+	 */
+	BUG_ON(clk_prepare(acpuclk_sources[PLL_1]));
+	BUG_ON(clk_prepare(acpuclk_sources[PLL_2]));
+	BUG_ON(clk_prepare(acpuclk_sources[PLL_3]));
 }
 
 static struct acpuclk_data acpuclk_7x30_data = {
@@ -488,7 +497,7 @@ static struct acpuclk_data acpuclk_7x30_data = {
 	.switch_time_us = 50,
 };
 
-static int __init acpuclk_7x30_init(struct acpuclk_soc_data *soc_data)
+static int __devinit acpuclk_7x30_probe(struct platform_device *pdev)
 {
 	pr_info("%s()\n", __func__);
 
@@ -500,9 +509,67 @@ static int __init acpuclk_7x30_init(struct acpuclk_soc_data *soc_data)
 	setup_cpufreq_table();
 	acpuclk_register(&acpuclk_7x30_data);
 
+	pr_info("ACPU init done, clock rate is: %d KHz\n", drv_state.current_speed->acpu_clk_khz);
+
 	return 0;
 }
 
-struct acpuclk_soc_data acpuclk_7x30_soc_data __initdata = {
-	.init = acpuclk_7x30_init,
+static struct platform_driver acpuclk_7x30_driver = {
+	.probe = acpuclk_7x30_probe,
+	.driver = {
+		.name = "acpuclk-7x30",
+		.owner = THIS_MODULE,
+	},
 };
+
+static int __init acpuclk_7x30_init(void)
+{
+	return platform_driver_register(&acpuclk_7x30_driver);
+}
+postcore_initcall(acpuclk_7x30_init);
+
+#ifdef CONFIG_CPU_FREQ_VDD_LEVELS
+#define VDD_MIN_UV_MV  750U
+#define VDD_MAX_UV_MV 1450U
+
+ssize_t acpuclk_get_vdd_levels_str(char *buf)
+{
+	int i, len = 0;
+	if (buf)
+	{
+		mutex_lock(&drv_state.lock);
+		for (i = 0; acpu_freq_tbl[i].acpu_clk_khz; i++)
+		{
+			if(acpu_freq_tbl[i].use_for_scaling==1)
+			{
+				len += sprintf(buf + len, "%8u: %4d\n", acpu_freq_tbl[i].acpu_clk_khz, acpu_freq_tbl[i].vdd_mv);
+			}
+		}
+		mutex_unlock(&drv_state.lock);
+	}
+	return len;
+}
+
+void acpuclk_set_vdd(unsigned int khz, int vdd)
+{
+	int i;
+	unsigned int new_vdd;
+	vdd = vdd / V_STEP * V_STEP;
+	mutex_lock(&drv_state.lock);
+	for (i = 0; acpu_freq_tbl[i].acpu_clk_khz; i++)
+	{
+		if (acpu_freq_tbl[i].use_for_scaling == 1)
+		{
+			if (khz == 0)
+				new_vdd = min(max((unsigned int)(acpu_freq_tbl[i].vdd_mv + vdd), VDD_MIN_UV_MV), VDD_MAX_UV_MV);
+			else if (acpu_freq_tbl[i].acpu_clk_khz == khz)
+				new_vdd = min(max((unsigned int)vdd, VDD_MIN_UV_MV), VDD_MAX_UV_MV);
+			else continue;
+
+			acpu_freq_tbl[i].vdd_mv = new_vdd;
+			acpu_freq_tbl[i].vdd_raw = VDD_RAW(new_vdd);
+		}
+	}
+	mutex_unlock(&drv_state.lock);
+}
+#endif

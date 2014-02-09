@@ -18,7 +18,12 @@
 #include <linux/completion.h>
 #include <linux/wakelock.h>
 #include <linux/clk.h>
+#include <linux/pm_qos.h>
+
 #include <asm/atomic.h>
+
+#include <mach/cpuidle.h>
+
 #include "msm_fb.h"
 
 #define DEBUG
@@ -64,7 +69,7 @@ static struct work_struct hpd_duty_work;
 static unsigned int monitor_sense;
 static boolean hpd_cable_chg_detected;
 
-struct wake_lock wlock;
+static struct pm_qos_request pm_qos_req;
 
 /* Change HDMI state */
 static void change_hdmi_state(int online)
@@ -344,7 +349,7 @@ static int adv7520_power_on(struct platform_device *pdev)
 {
 	struct msm_fb_data_type *mfd = platform_get_drvdata(pdev);
 
-	clk_enable(tv_enc_clk);
+	clk_prepare_enable(tv_enc_clk);
 	external_common_state->dev = &pdev->dev;
 	if (mfd != NULL) {
 		DEV_INFO("adv7520_power: ON (%dx%d %d)\n",
@@ -366,7 +371,7 @@ static int adv7520_power_on(struct platform_device *pdev)
 	} else
 		DEV_INFO("power_on: cable NOT detected\n");
 	adv7520_comm_power(0, 1);
-	wake_lock(&wlock);
+	pm_qos_update_request(&pm_qos_req, msm_cpuidle_get_deep_idle_latency());
 
 	return 0;
 }
@@ -376,9 +381,9 @@ static int adv7520_power_off(struct platform_device *pdev)
 	DEV_INFO("power_off\n");
 	adv7520_comm_power(1, 1);
 	adv7520_chip_off();
-	wake_unlock(&wlock);
+	pm_qos_update_request(&pm_qos_req, PM_QOS_DEFAULT_VALUE);
 	adv7520_comm_power(0, 1);
-	clk_disable(tv_enc_clk);
+	clk_disable_unprepare(tv_enc_clk);
 	return 0;
 }
 
@@ -874,11 +879,11 @@ static int __devinit
 	} else
 		DEV_ERR("adv7520_probe: failed to add fb device\n");
 
-#ifdef CONFIG_FB_MSM_HDMI_AS_PRIMARY
-	external_common_state->sdev.name = "hdmi_as_primary";
-#else
-	external_common_state->sdev.name = "hdmi";
-#endif
+	if (hdmi_prim_display)
+		external_common_state->sdev.name = "hdmi_as_primary";
+	else
+		external_common_state->sdev.name = "hdmi";
+
 	if (switch_dev_register(&external_common_state->sdev) < 0)
 		DEV_ERR("Hdmi switch registration failed\n");
 
@@ -899,7 +904,7 @@ static int __devexit adv7520_remove(struct i2c_client *client)
 		return -ENODEV;
 	}
 	switch_dev_unregister(&external_common_state->sdev);
-	wake_lock_destroy(&wlock);
+	pm_qos_remove_request(&pm_qos_req);
 	kfree(dd);
 	dd = NULL;
 	return 0;
@@ -1006,7 +1011,8 @@ static int __init adv7520_init(void)
 		*hdtv_mux = 0x8000;
 		iounmap(hdtv_mux);
 	}
-	wake_lock_init(&wlock, WAKE_LOCK_IDLE, "hdmi_active");
+	pm_qos_add_request(&pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
+				PM_QOS_DEFAULT_VALUE);
 
 	return 0;
 

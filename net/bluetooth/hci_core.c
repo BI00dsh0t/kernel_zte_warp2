@@ -60,7 +60,7 @@ static void hci_tx_task(unsigned long arg);
 
 static DEFINE_RWLOCK(hci_task_lock);
 
-static int enable_smp = 1;
+static bool enable_smp = 1;
 
 /* HCI device list */
 LIST_HEAD(hci_dev_list);
@@ -305,6 +305,12 @@ static void hci_le_init_req(struct hci_dev *hdev, unsigned long opt)
 
 	/* Read LE buffer size */
 	hci_send_cmd(hdev, HCI_OP_LE_READ_BUFFER_SIZE, 0, NULL);
+
+	/* Read LE clear white list */
+	hci_send_cmd(hdev, HCI_OP_LE_CLEAR_WHITE_LIST, 0, NULL);
+
+	/* Read LE white list size */
+	hci_send_cmd(hdev, HCI_OP_LE_READ_WHITE_LIST_SIZE, 0, NULL);
 }
 
 static void hci_scan_req(struct hci_dev *hdev, unsigned long opt)
@@ -536,13 +542,15 @@ int hci_dev_open(__u16 dev)
 	int ret = 0;
 
 	hdev = hci_dev_get(dev);
+	
 	if (!hdev)
 		return -ENODEV;
 
 	BT_DBG("%s %p", hdev->name, hdev);
+       printk("stone hci_dev_open 0 %d \n",(int)hdev->flags);  
 
 	hci_req_lock(hdev);
-
+       printk("stone hci_dev_open 1 %d \n",(int)hdev->flags);
 	if (hdev->rfkill && rfkill_blocked(hdev->rfkill)) {
 		ret = -ERFKILL;
 		goto done;
@@ -550,12 +558,13 @@ int hci_dev_open(__u16 dev)
 
 	if (test_bit(HCI_UP, &hdev->flags)) {
 		ret = -EALREADY;
+		printk("stone hci_dev_open in EALREADY and return \n");
 		goto done;
 	}
-
+       printk("stone hci_dev_open 2 %d \n",(int)hdev->flags);
 	if (test_bit(HCI_QUIRK_RAW_DEVICE, &hdev->quirks))
 		set_bit(HCI_RAW, &hdev->flags);
-
+       printk("stone hci_dev_open 3 %d \n",(int)hdev->flags);
 	if (hdev->open(hdev)) {
 		ret = -EIO;
 		goto done;
@@ -578,30 +587,49 @@ int hci_dev_open(__u16 dev)
 		atomic_set(&hdev->cmd_cnt, 1);
 		set_bit(HCI_INIT, &hdev->flags);
 		hdev->init_last_cmd = 0;
-
+              printk("stone hci_dev_open 4 %d \n",(int)hdev->flags);
 		printk("wait for a while  before send HCI command\n");
 		msleep(500);
 		printk("after wait\n");
 		ret = __hci_request(hdev, hci_init_req, 0,
 					msecs_to_jiffies(HCI_INIT_TIMEOUT));
-
+              printk("stone hci_dev_open 5 %d \n",(int)hdev->flags);
 		if (lmp_le_capable(hdev))
 			ret = __hci_request(hdev, hci_le_init_req, 0,
 					msecs_to_jiffies(HCI_INIT_TIMEOUT));
 
 		clear_bit(HCI_INIT, &hdev->flags);
+		printk("stone hci_dev_open 6 %d \n",(int)hdev->flags);
 	}
 
 	if (!ret) {
 		hci_dev_hold(hdev);
 		set_bit(HCI_UP, &hdev->flags);
+		printk("stone hci_dev_open 7 %d \n",(int)hdev->flags);
 		hci_notify(hdev, HCI_DEV_UP);
-		if (!test_bit(HCI_SETUP, &hdev->flags) &&
-				hdev->dev_type == HCI_BREDR) {
+		printk("stone hci_dev_open 8 %d \n",(int)hdev->flags);
+		if (!test_bit(HCI_SETUP, &hdev->flags) ) 
+	       {
+	              printk("stone __hci_request 3 %d \n",ret);
+		       if(hdev->dev_type == HCI_BREDR)
+		       {
 			hci_dev_lock_bh(hdev);
-			mgmt_powered(hdev->id, 1);
+        			ret= mgmt_powered(hdev->id, 1);
+        			printk("stone mgmt_powered  %d \n",ret);
 			hci_dev_unlock_bh(hdev);
 		}
+		}
+		else
+		{
+                    ret = 1;
+		}
+		/*if (!test_bit(HCI_SETUP, &hdev->flags) &&
+				hdev->dev_type == HCI_BREDR) {
+			hci_dev_lock_bh(hdev);
+			ret= mgmt_powered(hdev->id, 1);
+			printk("stone mgmt_powered  %d \n",ret);
+			hci_dev_unlock_bh(hdev);
+		}*/
 	} else {
 		/* Init failed, cleanup */
 		tasklet_kill(&hdev->rx_task);
@@ -996,8 +1024,14 @@ static void hci_power_on(struct work_struct *work)
 	int err;
 
 	BT_DBG("%s", hdev->name);
-
+       printk("stone hci_power_on 0 %d \n",(int)hdev->flags);
 	err = hci_dev_open(hdev->id);
+	if(err == 1)
+	{
+           printk("stone hci_power_on redo workqueue %d \n",(int)hdev->flags);
+           queue_work(hdev->workqueue, &hdev->power_on);
+	}
+	 printk("stone hci_power_on err = %d\n",err);
 	if (err && err != -EALREADY)
 		return;
 
@@ -1566,7 +1600,7 @@ int hci_unregister_dev(struct hci_dev *hdev)
 	list_del(&hdev->list);
 	write_unlock_bh(&hci_dev_list_lock);
 
-	hci_dev_do_close(hdev, 0);
+	hci_dev_do_close(hdev, hdev->bus == HCI_SMD);
 
 	for (i = 0; i < NUM_REASSEMBLY; i++)
 		kfree_skb(hdev->reassembly[i]);

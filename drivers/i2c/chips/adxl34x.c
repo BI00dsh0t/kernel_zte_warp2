@@ -10,8 +10,8 @@
  *	Revision:  none
  *	Compiler:  gcc
  *
- * 	Author:    Feng Yuao
- *	Company:   ZTE Corporation, China
+ * 	Author:    
+ *	Company:   
  *
  * ===================================================================================================
  */

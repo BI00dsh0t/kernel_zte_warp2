@@ -139,7 +139,6 @@ static void early_suspend(struct work_struct *work)
 	enqueue_sync_work(10 * HZ);
 	//end
 
-	//ZTE_PM_ZHENGCHAO_20100402_01
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("early_suspend: sync end\n");
 	zte_update_lateresume_2_earlysuspend_time(false);//LHX_PM_20110411_01,update earlysuspend time

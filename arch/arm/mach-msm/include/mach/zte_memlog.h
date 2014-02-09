@@ -18,8 +18,8 @@ When           Who                   What
 
 #define ERR_DATA_MAX_SIZE 0x4000
 
-#define MAGIC_VOLUME_DOWN_KEY 0x75898668 //"KYVD"
-#define MAGIC_VOLUME_UP_KEY 0x75898680  //"KYVP"
+#define MAGIC_VOLUME_DOWN_KEY 0x75898668
+#define MAGIC_VOLUME_UP_KEY 0x75898680
 
 typedef struct
 {
@@ -38,10 +38,10 @@ typedef struct {
   unsigned int f3log;
   unsigned int err_fatal;
   unsigned int err_dload;
-  unsigned int boot_pressed_keys[2];//0-upkey, 1-downkey; hml add to support exit ftm,
+  unsigned int boot_pressed_keys[2];
   char err_log[ERR_DATA_MAX_SIZE];
   unsigned char flash_id[2];
-  unsigned char sdrem_length;//0:128M; 1:256M; 2:384M; 3:512M; ...
+  unsigned char sdrem_length;
 
   unsigned char reset_flag;
   unsigned char boot_success;
@@ -50,12 +50,9 @@ typedef struct {
 
   unsigned char pm_reason;
   
-/* mboard_version be included by GPIO[173] GPIO[174] GPIO[175] in project N860-7x30,
-                                  ordered by      bit[5]        bit[6]         bit[7]
-*/
   unsigned int mboard_id;
 
- unsigned int key_is_on; 
+ unsigned int key_is_on;
  unsigned int rtc_alarm;
   struct smem_batt_chg_t batchginfo;
   unsigned int secboot_enable;

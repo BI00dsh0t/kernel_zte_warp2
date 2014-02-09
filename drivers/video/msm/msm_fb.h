@@ -50,9 +50,7 @@
 #define MFD_KEY  0x11161126
 #define MSM_FB_MAX_DEV_LIST 32
 
-/********************************
-LCD_PANEL_ID   ZTE_LCD_LHT_20100611_001
-********************************/
+
 typedef enum {
 	LCD_PANEL_NOPANEL,
 	LCD_PANEL_P726_ILI9325C,
@@ -82,8 +80,25 @@ typedef enum {
 	LCD_PANEL_4P3_NT35516_TRULY,
 	LCD_PANEL_4P3_NT35516_AUO,
 	LCD_PANEL_4P3_OTM9608A_BOE,
+	LCD_PANEL_4P_OTM8009_CMI,
+	LCD_PANEL_4P_R61408e_LG,
+	LCD_PANEL_4P_HX8369A_LG,
 	LCD_PANEL_MAX
 } LCD_PANEL_ID;
+
+//lxt modified
+typedef enum
+{
+	LCD_PANEL_NONE = 0,
+	LCD_PANEL_LEAD_OTM8009_WVGA,
+	LCD_PANEL_TRULY_R61408e_WVGA,
+	LCD_PANEL_LEAD_HX8369_WVGA,
+	LCD_PANEL_TRULY_NT35516_QHD,
+	LCD_PANEL_LEAD_NT35516_AUO_QHD,
+	LCD_PANEL_BOE_OTM9608A_QHD
+}LCD_PANEL_TYPE;
+//end
+
 
 struct disp_info_type_suspend {
 	boolean op_enable;
@@ -95,6 +110,7 @@ struct msmfb_writeback_data_list {
 	struct list_head registered_entry;
 	struct list_head active_entry;
 	void *addr;
+	struct ion_handle *ihdl;
 	struct file *pmem_file;
 	struct msmfb_data buf_info;
 	struct msmfb_img img;
@@ -114,6 +130,7 @@ struct msm_fb_data_type {
 	DISP_TARGET dest;
 	struct fb_info *fbi;
 
+	struct device *dev;
 	boolean op_enable;
 	uint32 fb_imgType;
 	boolean sw_currently_refreshing;
@@ -166,6 +183,9 @@ struct msm_fb_data_type {
 			      struct fb_cmap *cmap);
 	int (*do_histogram) (struct fb_info *info,
 			      struct mdp_histogram_data *hist);
+	int (*start_histogram) (struct mdp_histogram_start_req *req);
+	int (*stop_histogram) (struct fb_info *info, uint32_t block);
+	void (*vsync_ctrl) (int enable);
 	void *cursor_buf;
 	void *cursor_buf_phys;
 
@@ -180,6 +200,7 @@ struct msm_fb_data_type {
 	__u32 var_xres;
 	__u32 var_yres;
 	__u32 var_pixclock;
+	__u32 var_frame_rate;
 
 #ifdef MSM_FB_ENABLE_DBGFS
 	struct dentry *sub_dir;
@@ -206,14 +227,15 @@ struct msm_fb_data_type {
 	struct list_head writeback_register_queue;
 	wait_queue_head_t wait_q;
 	struct ion_client *iclient;
+	unsigned long display_iova;
+	unsigned long rotator_iova;
 	struct mdp_buf_type *ov0_wb_buf;
 	struct mdp_buf_type *ov1_wb_buf;
 	u32 ov_start;
 	u32 mem_hid;
 	u32 mdp_rev;
-	u32 use_ov0_blt, ov0_blt_state;
-	u32 use_ov1_blt, ov1_blt_state;
 	u32 writeback_state;
+	bool writeback_active_cnt;
 	int cont_splash_done;
 };
 
@@ -242,5 +264,12 @@ void msm_fb_config_backlight(struct msm_fb_data_type *mfd);
 
 void fill_black_screen(void);
 void unfill_black_screen(void);
+int msm_fb_check_frame_rate(struct msm_fb_data_type *mfd,
+				struct fb_info *info);
+
+#ifdef CONFIG_FB_MSM_LOGO
+#define INIT_IMAGE_FILE "/logo.bmp"//"/logo.rle"
+int load_565rle_image(char *filename, bool bf_supported);
+#endif
 
 #endif /* MSM_FB_H */

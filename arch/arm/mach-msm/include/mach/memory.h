@@ -42,7 +42,11 @@
 
 #define EBI0_PHYS_OFFSET PHYS_OFFSET
 #define EBI0_PAGE_OFFSET PAGE_OFFSET
+#if defined(CONFIG_ZTE_3_CHANNEL_6G_DDR_CFG1)
 #define EBI0_SIZE 0x10000000
+#else
+#define EBI0_SIZE 0x20000000
+#endif
 
 #ifndef __ASSEMBLY__
 
@@ -102,6 +106,7 @@ void invalidate_caches(unsigned long, unsigned long, unsigned long);
 int platform_physical_remove_pages(u64, u64);
 int platform_physical_active_pages(u64, u64);
 int platform_physical_low_power_pages(u64, u64);
+unsigned long get_ddr_size(void);
 
 extern int (*change_memory_power)(u64, u64, int);
 
@@ -123,6 +128,7 @@ extern void store_ttbr0(void);
 #ifdef CONFIG_DONT_MAP_HOLE_AFTER_MEMBANK0
 extern unsigned long membank0_size;
 extern unsigned long membank1_start;
+void find_membank0_hole(void);
 
 #define MEMBANK0_PHYS_OFFSET PHYS_OFFSET
 #define MEMBANK0_PAGE_OFFSET PAGE_OFFSET
