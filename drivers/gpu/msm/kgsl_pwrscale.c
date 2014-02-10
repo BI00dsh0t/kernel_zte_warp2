@@ -90,8 +90,7 @@ static ssize_t pwrscale_policy_show(struct kgsl_device *device, char *buf)
 	return ret;
 }
 
-// zte set from 0664 to 0666
-PWRSCALE_ATTR(policy, 0644, pwrscale_policy_show, pwrscale_policy_store);
+PWRSCALE_ATTR(policy, 0664, pwrscale_policy_show, pwrscale_policy_store);
 
 static ssize_t pwrscale_avail_policies_show(struct kgsl_device *device,
 					    char *buf)
